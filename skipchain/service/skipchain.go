@@ -170,7 +170,7 @@ func (s *Service) StoreSkipBlock(psbd *skipchain.StoreSkipBlock) (*skipchain.Sto
 					"Didn't get skipblock in back-link")
 			}
 			if err := s.forwardSignature(
-				&skipchain.ForwardSignature{i + 1, prev.Hash, prop,
+				&ForwardSignature{i + 1, prev.Hash, prop,
 					prev.GetForward(0)}); err != nil {
 				// This is not a critical failure - we have at least
 				// one forward-link
@@ -320,7 +320,7 @@ func (s *Service) getUpdateBlock(known *skipchain.SkipBlock, unknown skipchain.S
 
 // forwardSignature receives a signature request of a newly accepted block.
 // It only needs the 2nd-newest block and the forward-link.
-func (s *Service) forwardSignature(fs *skipchain.ForwardSignature) error {
+func (s *Service) forwardSignature(fs *ForwardSignature) error {
 	if fs.TargetHeight >= len(fs.Newest.BackLinkIDs) {
 		return errors.New("This backlink-height doesn't exist")
 	}
@@ -395,7 +395,7 @@ func (s *Service) bftVerifyFollowBlock(msg []byte, data []byte) bool {
 		if err != nil {
 			return err
 		}
-		fs, ok := fsInt.(*skipchain.ForwardSignature)
+		fs, ok := fsInt.(*ForwardSignature)
 		if !ok {
 			return errors.New("Didn't receive a ForwardSignature")
 		}
@@ -483,7 +483,7 @@ func (s *Service) bftVerifyNewBlock(msg []byte, data []byte) bool {
 
 // PropagateSkipBlock will save a new SkipBlock
 func (s *Service) propagateSkipBlock(msg network.Message) {
-	sbs, ok := msg.(*skipchain.PropagateSkipBlocks)
+	sbs, ok := msg.(*PropagateSkipBlocks)
 	if !ok {
 		log.Error("Couldn't convert to slice of SkipBlocks")
 		return
@@ -631,7 +631,7 @@ func (s *Service) startPropagation(blocks []*skipchain.SkipBlock) error {
 	}
 	roster := onet.NewRoster(siList)
 
-	replies, err := s.propagate(roster, &skipchain.PropagateSkipBlocks{blocks}, propagateTimeout)
+	replies, err := s.propagate(roster, &PropagateSkipBlocks{blocks}, propagateTimeout)
 	if err != nil {
 		return err
 	}

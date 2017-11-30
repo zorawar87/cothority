@@ -16,11 +16,6 @@ func init() {
 		// Fetch all skipchains
 		&GetAllSkipchains{},
 		&GetAllSkipchainsReply{},
-		// - Internal calls
-		// Propagation
-		&PropagateSkipBlocks{},
-		// Request forward-signature
-		&ForwardSignature{},
 		// - Data structures
 		&SkipBlockFix{},
 		&SkipBlock{},
@@ -68,30 +63,6 @@ type GetAllSkipchains struct {
 // GetAllSkipchainsReply - returns all known last blocks of skipchains.
 type GetAllSkipchainsReply struct {
 	SkipChains []*SkipBlock
-}
-
-// Internal calls
-
-// PropagateSkipBlocks sends a newly signed SkipBlock to all members of
-// the Cothority
-type PropagateSkipBlocks struct {
-	SkipBlocks []*SkipBlock
-}
-
-// ForwardSignature is called once a new skipblock has been accepted by
-// signing the forward-link, and then the older skipblocks need to
-// update their forward-links. Each cothority needs to get the necessary
-// blocks and propagate the skipblocks itself.
-type ForwardSignature struct {
-	// TargetHeight is the index in the backlink-slice of the skipblock
-	// to update
-	TargetHeight int
-	// Previous is the second-newest skipblock
-	Previous SkipBlockID
-	// Newest is the newest skipblock, signed by previous
-	Newest *SkipBlock
-	// ForwardLink is the signature from Previous to Newest
-	ForwardLink *BlockLink
 }
 
 // GetSingleBlock asks for a single block.

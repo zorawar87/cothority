@@ -21,7 +21,13 @@ func init() {
 		// Reply with updated block
 		&GetBlockReply{},
 		// Own service
-		&Service{})
+		&Service{},
+		// - Internal calls
+		// Propagation
+		&PropagateSkipBlocks{},
+		// Request forward-signature
+		&ForwardSignature{},
+	)
 }
 
 // GetService makes it possible to give either an `onet.Context` or
@@ -48,13 +54,29 @@ type GetBlock struct {
 	ID skipchain.SkipBlockID
 }
 
-// PropagateSkipBlock sends a newly signed SkipBlock to all members of
+// PropagateSkipBlocks sends a newly signed SkipBlock to all members of
 // the Cothority
-type PropagateSkipBlock struct {
-	SkipBlock *skipchain.SkipBlock
+type PropagateSkipBlocks struct {
+	SkipBlocks []*skipchain.SkipBlock
 }
 
 // GetBlockReply returns the requested block.
 type GetBlockReply struct {
 	SkipBlock *skipchain.SkipBlock
+}
+
+// ForwardSignature is called once a new skipblock has been accepted by
+// signing the forward-link, and then the older skipblocks need to
+// update their forward-links. Each cothority needs to get the necessary
+// blocks and propagate the skipblocks itself.
+type ForwardSignature struct {
+	// TargetHeight is the index in the backlink-slice of the skipblock
+	// to update
+	TargetHeight int
+	// Previous is the second-newest skipblock
+	Previous skipchain.SkipBlockID
+	// Newest is the newest skipblock, signed by previous
+	Newest *skipchain.SkipBlock
+	// ForwardLink is the signature from Previous to Newest
+	ForwardLink *skipchain.BlockLink
 }
