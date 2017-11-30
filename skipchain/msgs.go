@@ -21,15 +21,9 @@ func init() {
 		&PropagateSkipBlocks{},
 		// Request forward-signature
 		&ForwardSignature{},
-		// Request updated block
-		&GetBlock{},
-		// Reply with updated block
-		&GetBlockReply{},
 		// - Data structures
 		&SkipBlockFix{},
 		&SkipBlock{},
-		// Own service
-		&Service{},
 	} {
 		network.RegisterMessage(m)
 	}
@@ -109,23 +103,4 @@ type GetSingleBlock struct {
 type GetSingleBlockByIndex struct {
 	Genesis SkipBlockID
 	Index   int
-}
-
-// Internal calls
-
-// GetBlock asks for an updated block, in case for a conode that is not
-// in the roster-list of that block.
-type GetBlock struct {
-	ID SkipBlockID
-}
-
-// PropagateSkipBlock sends a newly signed SkipBlock to all members of
-// the Cothority
-type PropagateSkipBlock struct {
-	SkipBlock *SkipBlock
-}
-
-// GetBlockReply returns the requested block.
-type GetBlockReply struct {
-	SkipBlock *SkipBlock
 }

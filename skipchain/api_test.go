@@ -1,4 +1,4 @@
-package skipchain
+package skipchain_test
 
 import (
 	"testing"
@@ -9,10 +9,15 @@ import (
 
 	"sync"
 
+	"github.com/dedis/cothority"
+	"github.com/dedis/cothority/skipchain"
+	_ "github.com/dedis/cothority/skipchain/service"
 	"github.com/dedis/onet"
 	"github.com/dedis/onet/log"
 	"github.com/dedis/onet/network"
 )
+
+var tSuite = cothority.Suite
 
 func init() {
 	network.RegisterMessage(&testData{})
@@ -23,13 +28,13 @@ func TestClient_CreateGenesis(t *testing.T) {
 	_, roster, _ := l.GenTree(3, true)
 	defer l.CloseAll()
 	c := newTestClient(l)
-	_, cerr := c.CreateGenesis(roster, 1, 1, VerificationNone,
+	_, cerr := c.CreateGenesis(roster, 1, 1, skipchain.VerificationNone,
 		[]byte{1, 2, 3}, nil)
 	require.Nil(t, cerr)
-	_, cerr = c.CreateGenesis(roster, 1, 0, VerificationNone,
+	_, cerr = c.CreateGenesis(roster, 1, 0, skipchain.VerificationNone,
 		&testData{}, nil)
 	require.NotNil(t, cerr)
-	_, cerr = c.CreateGenesis(roster, 1, 1, VerificationNone,
+	_, cerr = c.CreateGenesis(roster, 1, 1, skipchain.VerificationNone,
 		&testData{}, nil)
 	require.Nil(t, cerr)
 	_, _, cerr = c.CreateRootControl(roster, roster, nil, 1, 1, 0)
@@ -53,7 +58,7 @@ func TestClient_GetUpdateChain(t *testing.T) {
 	_, el, _ := l.GenTree(5, true)
 	defer l.CloseAll()
 
-	clients := make(map[int]*Client)
+	clients := make(map[int]*skipchain.Client)
 	for i := range [8]byte{} {
 		clients[i] = newTestClient(l)
 	}
@@ -108,7 +113,7 @@ func TestClient_StoreSkipBlock(t *testing.T) {
 	log.ErrFatal(cerr)
 	el2 := onet.NewRoster(el.List[:nbrHosts-1])
 	log.Lvl1("Proposing roster", el2)
-	var sb1 *StoreSkipBlockReply
+	var sb1 *skipchain.StoreSkipBlockReply
 	sb1, cerr = c.StoreSkipBlock(inter, el2, nil)
 	log.ErrFatal(cerr)
 	log.Lvl1("Proposing same roster again")
@@ -127,7 +132,7 @@ func TestClient_StoreSkipBlock(t *testing.T) {
 		"second should point to third SkipBlock")
 
 	log.Lvl1("Checking update-chain")
-	var updates *GetUpdateChainReply
+	var updates *skipchain.GetUpdateChainReply
 	// Check if we get a conode that doesn't know about the latest block.
 	for i := 0; i < 10; i++ {
 		updates, cerr = c.GetUpdateChain(inter.Roster, inter.Hash)
@@ -150,11 +155,11 @@ func TestClient_GetAllSkipchains(t *testing.T) {
 
 	c := newTestClient(l)
 	log.Lvl1("Creating root and control chain")
-	sb1, cerr := c.CreateGenesis(el, 1, 1, VerificationNone, nil, nil)
+	sb1, cerr := c.CreateGenesis(el, 1, 1, skipchain.VerificationNone, nil, nil)
 	log.ErrFatal(cerr)
 	_, cerr = c.StoreSkipBlock(sb1, el, nil)
 	log.ErrFatal(cerr)
-	sb2, cerr := c.CreateGenesis(el, 1, 1, VerificationNone, nil, nil)
+	sb2, cerr := c.CreateGenesis(el, 1, 1, skipchain.VerificationNone, nil, nil)
 	log.ErrFatal(cerr)
 	sb1id := sb1.SkipChainID()
 	sb2id := sb2.SkipChainID()
@@ -176,7 +181,7 @@ func TestClient_GetSingleBlockByIndex(t *testing.T) {
 
 	c := newTestClient(l)
 	log.Lvl1("Creating root and control chain")
-	sb1, cerr := c.CreateGenesis(roster, 1, 1, VerificationNone, nil, nil)
+	sb1, cerr := c.CreateGenesis(roster, 1, 1, skipchain.VerificationNone, nil, nil)
 	log.ErrFatal(cerr)
 	reply2, cerr := c.StoreSkipBlock(sb1, roster, nil)
 	log.ErrFatal(cerr)
@@ -190,8 +195,8 @@ func TestClient_GetSingleBlockByIndex(t *testing.T) {
 	require.NotNil(t, cerr)
 }
 
-func newTestClient(l *onet.LocalTest) *Client {
-	c := NewClient()
+func newTestClient(l *onet.LocalTest) *skipchain.Client {
+	c := skipchain.NewClient()
 	c.Client = l.NewClient("Skipchain")
 	return c
 }
