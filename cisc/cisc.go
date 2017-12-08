@@ -446,6 +446,20 @@ func kvList(c *cli.Context) error {
 	}
 	return nil
 }
+func kvWeb(c *cli.Context) error {
+	cfg := loadConfigOrFail(c)
+	if c.NArg() < 1 {
+		log.Fatal("Please give a path to a website")
+	}
+	key := c.Args().Get(0)
+	log.Info("Reading file", c.Args().Get(1))
+	data, err := ioutil.ReadFile(c.Args().Get(1))
+	log.ErrFatal(err)
+	prop := cfg.GetProposed()
+	prop.Storage[string(key)] = string(data)
+	cfg.proposeSendVoteUpdate(prop)
+	return cfg.saveConfig(c)
+}
 func kvValue(c *cli.Context) error {
 	log.Fatal("Not yet implemented")
 	return nil

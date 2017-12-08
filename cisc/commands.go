@@ -172,6 +172,11 @@ func init() {
 				ArgsUsage: "key",
 				Action:    kvDel,
 			},
+			{
+				Name:   "web",
+				Usage:  "path/name.html",
+				Action: kvWeb,
+			},
 		},
 	}
 	commandSSH = cli.Command{
