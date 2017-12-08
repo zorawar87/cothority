@@ -451,9 +451,10 @@ func kvWeb(c *cli.Context) error {
 	if c.NArg() < 1 {
 		log.Fatal("Please give a path to a website")
 	}
-	key := "web:" + c.Args().Get(0)
-	log.Info("Reading file", c.Args().Get(1))
-	data, err := ioutil.ReadFile(c.Args().Get(1))
+	file := c.Args().Get(0)
+	key := "web:" + file
+	log.Info("Reading file", file)
+	data, err := ioutil.ReadFile(file)
 	log.ErrFatal(err)
 	prop := cfg.GetProposed()
 	prop.Storage[string(key)] = string(data)
