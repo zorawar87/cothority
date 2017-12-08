@@ -451,7 +451,7 @@ func kvWeb(c *cli.Context) error {
 	if c.NArg() < 1 {
 		log.Fatal("Please give a path to a website")
 	}
-	key := c.Args().Get(0)
+	key := "web:" + c.Args().Get(0)
 	log.Info("Reading file", c.Args().Get(1))
 	data, err := ioutil.ReadFile(c.Args().Get(1))
 	log.ErrFatal(err)
