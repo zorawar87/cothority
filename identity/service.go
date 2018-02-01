@@ -69,12 +69,12 @@ type Service struct {
 	tagsLimits map[string]int8
 	// limits on number of skipchain creation. Map keys are public keys
 	pointsLimits map[string]int8
-	auth         authData
 }
 
 // StorageMap holds the map to the storages so it can be marshaled.
 type StorageMap struct {
 	Identities map[string]*Storage
+	Auth       authData
 }
 
 // Storage stores one identity together with the skipblocks.
@@ -109,14 +109,14 @@ func (s *Service) PinRequest(req *PinRequest) (network.Message, onet.ClientError
 	log.Lvl3("PinRequest", s.ServerIdentity())
 	if req.PIN == "" {
 		pin := fmt.Sprintf("%06d", random.Int(big.NewInt(1000000), s.Suite().RandomStream()))
-		s.auth.pins[pin] = struct{}{}
+		s.Auth.pins[pin] = struct{}{}
 		log.Info("PIN:", pin)
 		return nil, onet.NewClientErrorCode(ErrorWrongPIN, "Read PIN in server-log")
 	}
-	if _, ok := s.auth.pins[req.PIN]; !ok {
+	if _, ok := s.Auth.pins[req.PIN]; !ok {
 		return nil, onet.NewClientErrorCode(ErrorWrongPIN, "Wrong PIN")
 	}
-	s.auth.adminKeys = append(s.auth.adminKeys, req.Public)
+	s.Auth.adminKeys = append(s.Auth.adminKeys, req.Public)
 	s.save()
 	log.Lvl1("Successfully registered PIN/Public", req.PIN, req.Public)
 	return nil, nil
@@ -174,7 +174,7 @@ func (s *Service) StoreKeys(req *StoreKeys) (network.Message, onet.ClientError) 
 
 	// check Signature
 	valid := false
-	for _, key := range s.auth.adminKeys {
+	for _, key := range s.Auth.adminKeys {
 		if schnorr.Verify(s.Suite(), key, msg, req.Sig) == nil {
 			valid = true
 			break
@@ -187,9 +187,9 @@ func (s *Service) StoreKeys(req *StoreKeys) (network.Message, onet.ClientError) 
 	}
 	switch req.Type {
 	case PoPAuth:
-		s.auth.sets = append(s.auth.sets, anon.Set(req.Final.Attendees))
+		s.Auth.sets = append(s.Auth.sets, anon.Set(req.Final.Attendees))
 	case PublicAuth:
-		s.auth.keys = append(s.auth.keys, req.Publics...)
+		s.Auth.keys = append(s.Auth.keys, req.Publics...)
 	}
 	return nil, nil
 }
@@ -202,7 +202,7 @@ func (s *Service) Authenticate(ap *Authenticate) (network.Message, onet.ClientEr
 	ap.Ctx = []byte(ServiceName + s.ServerIdentity().String())
 	ap.Nonce = make([]byte, nonceSize)
 	random.Bytes(ap.Nonce, s.Suite().RandomStream())
-	s.auth.nonces[string(ap.Nonce)] = struct{}{}
+	s.Auth.nonces[string(ap.Nonce)] = struct{}{}
 	return ap, nil
 }
 
@@ -210,7 +210,7 @@ func (s *Service) Authenticate(ap *Authenticate) (network.Message, onet.ClientEr
 // managed identities.
 func (s *Service) CreateIdentity(ai *CreateIdentity) (network.Message, onet.ClientError) {
 	ctx := []byte(ServiceName + s.ServerIdentity().String())
-	if _, ok := s.auth.nonces[string(ai.Nonce)]; !ok {
+	if _, ok := s.Auth.nonces[string(ai.Nonce)]; !ok {
 		log.Error("Given nonce is not stored on ", s.ServerIdentity())
 		return nil, onet.NewClientErrorCode(ErrorAuthentication,
 			fmt.Sprintf("Given nonce is not stored on %s", s.ServerIdentity()))
@@ -223,7 +223,7 @@ func (s *Service) CreateIdentity(ai *CreateIdentity) (network.Message, onet.Clie
 			log.Error("Wrong authentication message")
 			ai.Public = nil
 		}
-		for _, set := range s.auth.sets {
+		for _, set := range s.Auth.sets {
 			t, err := anon.Verify(s.anonSuite, ai.Nonce, set, ctx, ai.Sig)
 			if err == nil {
 				tag = string(t)
@@ -238,7 +238,7 @@ func (s *Service) CreateIdentity(ai *CreateIdentity) (network.Message, onet.Clie
 					}
 				}
 				// authentication succeeded. we need to delete the nonce
-				delete(s.auth.nonces, string(ai.Nonce))
+				delete(s.Auth.nonces, string(ai.Nonce))
 				break
 			}
 		}
@@ -249,7 +249,7 @@ func (s *Service) CreateIdentity(ai *CreateIdentity) (network.Message, onet.Clie
 				"wrong public key authentication data")
 		}
 		found := false
-		for _, k := range s.auth.keys {
+		for _, k := range s.Auth.keys {
 			if k.Equal(ai.Public) {
 				found = true
 				break
@@ -718,7 +718,7 @@ func (s *Service) tryLoad() error {
 func newIdentityService(c *onet.Context) (onet.Service, error) {
 	s := &Service{
 		ServiceProcessor: onet.NewServiceProcessor(c),
-		StorageMap:       &StorageMap{make(map[string]*Storage)},
+		StorageMap:       &StorageMap{Identities: make(map[string]*Storage)},
 		skipchain:        skipchain.NewClient(),
 	}
 	if as, ok := c.Suite().(anon.Suite); ok {
@@ -754,10 +754,10 @@ func newIdentityService(c *onet.Context) (onet.Service, error) {
 		return nil, err
 	}
 	skipchain.RegisterVerification(c, VerifyIdentity, s.VerifyBlock)
-	s.auth.pins = make(map[string]struct{})
-	s.auth.nonces = make(map[string]struct{})
-	s.auth.sets = make([]anon.Set, 0)
-	s.auth.adminKeys = make([]kyber.Point, 0)
+	s.Auth.pins = make(map[string]struct{})
+	s.Auth.nonces = make(map[string]struct{})
+	s.Auth.sets = make([]anon.Set, 0)
+	s.Auth.adminKeys = make([]kyber.Point, 0)
 	s.tagsLimits = make(map[string]int8)
 	s.pointsLimits = make(map[string]int8)
 	return s, nil
