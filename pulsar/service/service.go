@@ -1,4 +1,4 @@
-package randhound
+package service
 
 import (
 	"errors"
@@ -42,12 +42,12 @@ func (s *Service) Setup(msg *SetupRequest) (*SetupReply, error) {
 
 	// Service has already been setup, ignoring further setup requests
 	if s.setup == true {
-		return nil, errors.New("Pulsar[RandHound] - service already setup")
+		return nil, errors.New("service already setup")
 	}
 	s.setup = true
 
 	if msg.Interval <= 0 {
-		return nil, errors.New("Pulsar[RandHound] - bad interval parameter")
+		return nil, errors.New("bad interval parameter")
 	}
 
 	s.tree = msg.Roster.GenerateBinaryTree()
@@ -88,7 +88,7 @@ func (s *Service) Random(msg *RandRequest) (*RandReply, error) {
 	s.randLock.Lock()
 	defer s.randLock.Unlock()
 	if s.setup == false || s.random == nil {
-		return nil, errors.New("Pulsar[RandHound] - service not setup")
+		return nil, errors.New("service not setup")
 	}
 
 	return &RandReply{
@@ -103,7 +103,7 @@ func (s *Service) propagate(env *network.Envelope) {
 
 func (s *Service) run() {
 	err := func() error {
-		log.Lvl2("Pulsar[RandHound] - creating randomness")
+		log.Lvl2("creating randomness")
 		proto, err := s.CreateProtocol(ServiceName, s.tree)
 		if err != nil {
 			return err
@@ -120,20 +120,20 @@ func (s *Service) run() {
 		select {
 		case <-rh.Done:
 
-			log.Lvlf1("Pulsar[RandHound] - done")
+			log.Lvlf1("done")
 
 			random, transcript, err := rh.Random()
 			if err != nil {
 				return err
 			}
-			log.Lvlf1("Pulsar[RandHound] - collective randomness: ok")
+			log.Lvlf1("collective randomness: ok")
 			//log.Lvlf1("RandHound - collective randomness: %v", random)
 
 			err = protocol.Verify(rh.Suite(), random, transcript)
 			if err != nil {
 				return err
 			}
-			log.Lvlf1("Pulsar[RandHound] - verification: ok")
+			log.Lvlf1("verification: ok")
 
 			s.randLock.Lock()
 			if s.random == nil {
@@ -149,7 +149,7 @@ func (s *Service) run() {
 		return nil
 	}()
 	if err != nil {
-		log.Error("Pulsar[RandHound] - while creating randomness:", err)
+		log.Error("while creating randomness:", err)
 	}
 }
 
@@ -162,7 +162,7 @@ func newService(c *onet.Context) (onet.Service, error) {
 		randReady:        make(chan bool),
 	}
 	if err := s.RegisterHandlers(s.Setup, s.Random); err != nil {
-		return nil, errors.New("Pulsar[RandHound] - couldn't register message processing functions")
+		return nil, errors.New("couldn't register message processing functions")
 	}
 	s.RegisterProcessorFunc(network.MessageType(propagateSetup{}), s.propagate)
 	return s, nil

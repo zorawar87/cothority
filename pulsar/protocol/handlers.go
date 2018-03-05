@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/dedis/cothority"
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/share"
 	"github.com/dedis/kyber/share/pvss"
 	"github.com/dedis/kyber/sign/cosi"
+	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/dedis/kyber/util/random"
 )
 
@@ -81,7 +83,8 @@ func (rh *RandHound) handleI1(i1 WI1) error {
 	}
 
 	// Sign R1 message
-	if err := signSchnorr(rh.Suite(), rh.Private(), r1); err != nil {
+	r1.Sig, err = schnorr.Sign(cothority.Suite, rh.Private(), r1.Hash())
+	if err != nil {
 		return err
 	}
 
@@ -104,7 +107,7 @@ func (rh *RandHound) handleR1(r1 WR1) error {
 	}
 
 	// Verify R1 message signature
-	if err := verifySchnorr(rh.Suite(), rh.serverKeys[grp][pos], msg); err != nil {
+	if err := schnorr.Verify(rh.Suite(), rh.serverKeys[grp][pos], msg.Hash(), msg.Sig); err != nil {
 		return err
 	}
 

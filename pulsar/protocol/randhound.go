@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -94,6 +95,20 @@ type Share struct {
 	Source      int               // Source roster index
 	Target      int               // Target roster index
 	PubVerShare *pvss.PubVerShare // Public verifiable share
+}
+
+// Hash creates a propoer hash of the Share structure to be copied to other
+// implementations.
+func (s *Share) Hash() []byte {
+	hash := sha256.New()
+	binary.Write(hash, binary.LittleEndian, int32(s.Source))
+	binary.Write(hash, binary.LittleEndian, int32(s.Target))
+	hash.Write(s.PubVerShare.S.Hash(cothority.Suite))
+	s.PubVerShare.P.C.MarshalTo(hash)
+	s.PubVerShare.P.R.MarshalTo(hash)
+	s.PubVerShare.P.VG.MarshalTo(hash)
+	s.PubVerShare.P.VH.MarshalTo(hash)
+	return hash.Sum(nil)
 }
 
 // TODO: Do we need to store the public commitment polynomials in the transcript?

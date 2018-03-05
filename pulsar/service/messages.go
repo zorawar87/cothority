@@ -1,4 +1,4 @@
-package randhound
+package service
 
 import (
 	"github.com/dedis/cothority/pulsar/protocol"

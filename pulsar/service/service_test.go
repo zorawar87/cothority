@@ -1,4 +1,4 @@
-package randhound
+package service
 
 import (
 	"testing"
@@ -12,7 +12,7 @@ func TestRandHoundService(t *testing.T) {
 	local := onet.NewTCPTest(cothority.Suite)
 	num := 10
 	groups := 2
-	purpose := "Pulsar[RandHound] - service test run"
+	purpose := "service test run"
 	interval := 5000
 	nodes, roster, _ := local.GenTree(num, true)
 	defer local.CloseAll()
@@ -26,12 +26,12 @@ func TestRandHoundService(t *testing.T) {
 	service := local.GetServices(nodes, randhoundService)[0].(*Service)
 
 	_, err := service.Setup(setupRequest)
-	log.ErrFatal(err, "Pulsar[RandHound] - service setup failed")
+	log.ErrFatal(err, "service setup failed")
 
 	randRequest := &RandRequest{}
 	reply, err := service.Random(randRequest)
-	log.ErrFatal(err, "Pulsar[RandHound] - service randomness request failed")
+	log.ErrFatal(err, "service randomness request failed")
 
-	log.Lvl1("Pulsar[RandHound] - randomness:", reply.R)
-	log.Lvl1("Pulsar[RandHound] - transcript:", reply.T)
+	log.Lvl1("randomness:", reply.R)
+	log.Lvl1("transcript:", reply.T)
 }

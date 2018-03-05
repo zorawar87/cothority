@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"crypto/sha256"
+
 	"github.com/dedis/kyber"
 	"github.com/dedis/onet"
 	"github.com/dedis/onet/network"
@@ -38,6 +40,22 @@ type R1 struct {
 	EncShares []*Share      // Encrypted shares
 	Coeffs    []kyber.Point // Commitments to polynomial coefficients
 	V         kyber.Point   // Server commitment used to sign chosen secrets
+}
+
+// Hash creates a hash of R1 in a way that it's easy to implement in other
+// languages.
+func (r *R1) Hash() []byte {
+	hash := sha256.New()
+	hash.Write(r.SID)
+	hash.Write(r.HI1)
+	for _, s := range r.EncShares {
+		hash.Write(s.Hash())
+	}
+	for _, c := range r.Coeffs {
+		c.MarshalTo(hash)
+	}
+	r.V.MarshalTo(hash)
+	return hash.Sum(nil)
 }
 
 // I2 is the message sent by the client to the servers in step 3.

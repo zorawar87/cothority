@@ -4,8 +4,8 @@ import (
 	"os"
 
 	"github.com/dedis/cothority"
-	"github.com/dedis/cothority/randhound"
-	"github.com/dedis/cothority/randhound/protocol"
+	"github.com/dedis/cothority/pulsar/protocol"
+	"github.com/dedis/cothority/pulsar/service"
 	"github.com/dedis/onet/app"
 	"github.com/dedis/onet/log"
 	"gopkg.in/urfave/cli.v1"
@@ -68,7 +68,7 @@ func main() {
 func cmdSetup(c *cli.Context) error {
 	// log.Info("Setup command")
 	group := readGroup(c)
-	client := randhound.NewClient()
+	client := service.NewClient()
 	_, err := client.Setup(group.Roster, c.Int("groups"), c.String("purpose"),
 		c.Int("interval"))
 	if err != nil {
@@ -82,7 +82,7 @@ func cmdSetup(c *cli.Context) error {
 func cmdRandom(c *cli.Context) error {
 	// log.Info("Random command")
 	group := readGroup(c)
-	client := randhound.NewClient()
+	client := service.NewClient()
 	reply, err := client.Random(group.Roster)
 	if err != nil {
 		return err
