@@ -518,7 +518,52 @@ func (s *Service) GetSingleBlockByIndex(id *GetSingleBlockByIndex) (*SkipBlock, 
 	}
 	return nil, errors.New(
 		"No block with this index found")
+}
 
+// GetForwardLinks returns a list of forward links that link the given
+// two blocks. In its simplest implementation, the node needs to have
+// all blocks available. MaxHeight gives the maximum allowed height when
+// traversing the forward links. If MaxHeight == 0, then always the maximum
+// height available will be used.
+func (s *Service) GetForwardLinks(ln *GetForwardLinks) (*GetForwardLinksReply, error) {
+	from, to := s.db.GetByID(ln.From), s.db.GetByID(ln.To)
+	if from == nil || to == nil {
+		return nil, errors.New("don't know from or to")
+	}
+	if !from.SkipChainID().Equal(to.SkipChainID()) {
+		return nil, errors.New("blocks are not on the same skipchain - cannot link them")
+	}
+	if from.Index >= to.Index {
+		return nil, errors.New("cannot go back in time - please reverse from and to")
+	}
+	var links []*ForwardLink
+	for !from.Hash.Equal(to.Hash) {
+		height := len(from.ForwardLink)
+		if height == 0 {
+			return nil, errors.New("encountered block without forward link before reaching target")
+		}
+		if ln.MaxHeight > 0 && height > ln.MaxHeight {
+			height = ln.MaxHeight - 1
+		}
+		for height >= 0 {
+			next := s.db.GetByID(from.ForwardLink[height].To)
+			if next == nil {
+				return nil, errors.New("missing block in forward links - cannot continue")
+			}
+			if next.Index <= to.Index {
+				links = append(links, from.ForwardLink[height])
+				from = next
+				break
+			}
+			height--
+		}
+		if height < 0 {
+			return nil, errors.New("target not found - overshooting it")
+		}
+	}
+	return &GetForwardLinksReply{
+		ForwardLinks: links,
+	}, nil
 }
 
 // GetAllSkipchains returns a list of all known skipchains

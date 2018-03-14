@@ -114,6 +114,7 @@ type PropagateSkipBlocks struct {
 // signing the forward-link, and then the older skipblocks need to
 // update their forward-links. Each cothority needs to get the necessary
 // blocks and propagate the skipblocks itself.
+// TODO: change that name to ForwardSignatureRequest
 type ForwardSignature struct {
 	// TargetHeight is the index in the backlink-slice of the skipblock
 	// to update
@@ -135,23 +136,21 @@ type GetSingleBlockByIndex struct {
 	Index   int
 }
 
-// Internal calls
-
-// GetBlock asks for an updated block, in case for a conode that is not
-// in the roster-list of that block.
-type GetBlock struct {
-	ID SkipBlockID
+// GetForwardLinks returns a list of forward links that link the given
+// two blocks. In its simplest implementation, the node needs to have
+// all blocks available. MaxHeight gives the maximum allowed height when
+// traversing the forward links. If MaxHeight == 0, then always the maximum
+// height available will be used.
+type GetForwardLinks struct {
+	From      SkipBlockID
+	To        SkipBlockID
+	MaxHeight int
 }
 
-// PropagateSkipBlock sends a newly signed SkipBlock to all members of
-// the Cothority
-type PropagateSkipBlock struct {
-	SkipBlock *SkipBlock
-}
-
-// GetBlockReply returns the requested block.
-type GetBlockReply struct {
-	SkipBlock *SkipBlock
+// GetForwardLinksReply is a slice of all forward links to connect the two
+// requested blocks.
+type GetForwardLinksReply struct {
+	ForwardLinks []*ForwardLink
 }
 
 // Protocol messages
@@ -294,4 +293,9 @@ type ListFollow struct {
 type ListFollowReply struct {
 	Follow    *[]FollowChainType
 	FollowIDs *[]SkipBlockID
+}
+
+// Proof stores everything needed to make an offline verification that a
+// given block is validly linked to the genesis block.
+type Proof struct {
 }
