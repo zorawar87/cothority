@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"time"
@@ -284,9 +285,10 @@ func (s *Service) ContractCoin(cdb CollectionView, inst Instruction, c []Coin) (
 	case inst.Spawn != nil:
 		// Spawn creates a new coin account as a separate instance. The subID is
 		// taken from the hash of the instruction.
+		ca := InstanceID{inst.InstanceID.DarcID, NewSubID(inst.Hash())}
+		log.Lvlf2("Spawing coin to %x", ca)
 		return []StateChange{
-			NewStateChange(Create, InstanceID{inst.InstanceID.DarcID, NewSubID(inst.Hash())},
-				ContractCoinID, inst.Spawn.Args.Search("value")),
+			NewStateChange(Create, ca, ContractCoinID, make([]byte, 8)),
 		}, c, nil
 	case inst.Invoke != nil:
 		// Invoke is one of "mint", "transfer", "fetch", or "store".
@@ -304,6 +306,7 @@ func (s *Service) ContractCoin(cdb CollectionView, inst Instruction, c []Coin) (
 		switch inst.Invoke.Command {
 		case "mint":
 			// mint simply adds this amount of coins to the account.
+			log.Lvl2("minting", coinsArg)
 			coinsCurrent += coinsArg
 		case "transfer":
 			// transfer sends a given amount of coins to another account.
@@ -320,10 +323,11 @@ func (s *Service) ContractCoin(cdb CollectionView, inst Instruction, c []Coin) (
 				return nil, nil, err
 			}
 			targetCoin := binary.LittleEndian.Uint64(v)
-			buf := make([]byte, 8)
-			binary.PutUvarint(buf, targetCoin+coinsArg)
+			var w bytes.Buffer
+			binary.Write(&w, binary.LittleEndian, targetCoin+coinsArg)
+			log.Lvlf2("transferring %d to %x", coinsArg, target)
 			sc = append(sc, NewStateChange(Update, NewInstanceID(target),
-				ContractCoinID, buf))
+				ContractCoinID, w.Bytes()))
 		case "fetch":
 			// fetch removes coins from the account and passes it on to the next
 			// instruction.
@@ -345,11 +349,14 @@ func (s *Service) ContractCoin(cdb CollectionView, inst Instruction, c []Coin) (
 		default:
 			return nil, nil, errors.New("Coin contract can only mine and transfer")
 		}
-		buf := make([]byte, 8)
-		binary.PutUvarint(buf, coinsCurrent)
+		// Finally update our own coin value and send one or two stateChanges to
+		// the system.
+		var w bytes.Buffer
+		binary.Write(&w, binary.LittleEndian, coinsCurrent)
 		return append(sc, NewStateChange(Update, inst.InstanceID,
-			ContractCoinID, buf)), c, nil
+			ContractCoinID, w.Bytes())), c, nil
 	case inst.Delete != nil:
+		// Delete our coin address, but only if the current coin is empty.
 		value, err := cdb.GetValue(inst.InstanceID.Slice())
 		if err != nil {
 			return nil, nil, err

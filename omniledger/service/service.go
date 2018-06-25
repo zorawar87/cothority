@@ -483,7 +483,7 @@ func (s *Service) createQueueWorker(scID skipchain.SkipBlockID, interval time.Du
 			select {
 			case t := <-c:
 				ts = append(ts, t)
-				log.Lvlf2("%x: Added transaction to queue. Next block length: %v, New Tx: %+v", scID, len(ts), t)
+				log.LLvlf2("%x: Stored transaction. Next block length: %v, New Tx: %+v", scID, len(ts), t)
 			case <-to:
 				if len(ts) > 0 {
 					log.Lvlf2("%x: New epoch and transaction-length: %d", scID, len(ts))
@@ -731,6 +731,7 @@ func newService(c *onet.Context) (onet.Service, error) {
 	s.registerContract(ContractConfigID, s.ContractConfig)
 	s.registerContract(ContractDarcID, s.ContractDarc)
 	s.registerContract(ContractValueID, s.ContractValue)
+	s.registerContract(ContractCoinID, s.ContractCoin)
 	skipchain.RegisterVerification(c, verifyOmniLedger, s.verifySkipBlock)
 	return s, nil
 }
