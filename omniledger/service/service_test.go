@@ -431,7 +431,7 @@ func TestService_DarcSpawn(t *testing.T) {
 		Instructions: []Instruction{{
 			InstanceID: InstanceID{
 				DarcID: s.darc.GetBaseID(),
-				SubID:  zeroSubID,
+				SubID:  ZeroSubID,
 			},
 			Nonce:  GenNonce(),
 			Index:  0,
@@ -448,7 +448,7 @@ func TestService_DarcSpawn(t *testing.T) {
 	require.Nil(t, ctx.Instructions[0].SignBy(s.signer))
 
 	s.sendTx(t, ctx)
-	pr := s.waitProof(t, InstanceID{darc2.GetBaseID(), zeroSubID})
+	pr := s.waitProof(t, InstanceID{darc2.GetBaseID(), ZeroSubID})
 	require.True(t, pr.InclusionProof.Match())
 }
 
@@ -483,7 +483,7 @@ func TestService_ValueSpawn(t *testing.T) {
 		Instructions: []Instruction{{
 			InstanceID: InstanceID{
 				DarcID: s.darc.GetBaseID(),
-				SubID:  zeroSubID,
+				SubID:  ZeroSubID,
 			},
 			Nonce:  GenNonce(),
 			Index:  0,
@@ -523,7 +523,7 @@ func darcToTx(t *testing.T, d2 darc.Darc, signer darc.Signer) ClientTransaction 
 	instr := Instruction{
 		InstanceID: InstanceID{
 			DarcID: d2.GetBaseID(),
-			SubID:  zeroSubID,
+			SubID:  ZeroSubID,
 		},
 		Nonce:  GenNonce(),
 		Index:  0,
@@ -591,7 +591,7 @@ func (s *ser) sendTxAndWait(t *testing.T, ctx ClientTransaction, id *InstanceID)
 	if id == nil {
 		id = &InstanceID{
 			DarcID: s.darc.GetBaseID(),
-			SubID:  zeroSubID,
+			SubID:  ZeroSubID,
 		}
 	}
 
@@ -605,7 +605,7 @@ func (s *ser) testDarcEvolution(t *testing.T, d2 darc.Darc, fail bool) (pr *Proo
 	for i := 0; i < 10; i++ {
 		resp, err := s.service().GetProof(&GetProof{
 			Version: CurrentVersion,
-			Key:     InstanceID{d2.GetBaseID(), zeroSubID}.Slice(),
+			Key:     InstanceID{d2.GetBaseID(), ZeroSubID}.Slice(),
 			ID:      s.sb.SkipChainID(),
 		})
 		require.Nil(t, err)

@@ -143,7 +143,7 @@ func (c *Client) GetGenDarc() (*darc.Darc, error) {
 func (c *Client) GetChainConfig() (*ChainConfig, error) {
 	d, err := c.GetGenDarc()
 
-	cfid := InstanceID{d.GetBaseID(), one}
+	cfid := InstanceID{d.GetBaseID(), oneSubID}
 	p, err := c.GetProof(cfid.Slice())
 	if err != nil {
 		return nil, err

@@ -139,7 +139,7 @@ func (s *Service) CreateGenesisBlock(req *CreateGenesisBlock) (
 	transaction := []ClientTransaction{{
 		Instructions: []Instruction{{
 			InstanceID: InstanceID{DarcID: req.GenesisDarc.GetID()},
-			Nonce:      zeroNonce,
+			Nonce:      ZeroNonce,
 			Index:      0,
 			Length:     1,
 			Spawn:      spawn,
@@ -219,7 +219,7 @@ func (s *Service) SetPropagationTimeout(p time.Duration) {
 func toInstanceID(dID darc.ID) InstanceID {
 	return InstanceID{
 		DarcID: dID,
-		SubID:  zeroSubID,
+		SubID:  ZeroSubID,
 	}
 }
 
@@ -730,8 +730,6 @@ func newService(c *onet.Context) (onet.Service, error) {
 
 	s.registerContract(ContractConfigID, s.ContractConfig)
 	s.registerContract(ContractDarcID, s.ContractDarc)
-	s.registerContract(ContractValueID, s.ContractValue)
-	s.registerContract(ContractCoinID, s.ContractCoin)
 	skipchain.RegisterVerification(c, verifyOmniLedger, s.verifySkipBlock)
 	return s, nil
 }
