@@ -452,62 +452,6 @@ func TestService_DarcSpawn(t *testing.T) {
 	require.True(t, pr.InclusionProof.Match())
 }
 
-func TestService_ValueSpawn(t *testing.T) {
-	s := newSer(t, 1, testInterval)
-	defer s.local.CloseAll()
-	defer closeQueues(s.local)
-
-	darc2 := s.darc.Copy()
-	darc2.Rules.AddRule("spawn:value", darc2.Rules.GetSignExpr())
-	darc2.BaseID = s.darc.GetBaseID()
-	darc2.PrevID = s.darc.GetID()
-	darc2.Version++
-	ctx := darcToTx(t, *darc2, s.signer)
-	s.sendTx(t, ctx)
-	for {
-		pr := s.waitProof(t, ctx.Instructions[0].InstanceID)
-		require.True(t, pr.InclusionProof.Match())
-		values, err := pr.InclusionProof.RawValues()
-		require.Nil(t, err)
-		d, err := darc.NewFromProtobuf(values[0])
-		require.Nil(t, err)
-		if d.Version == darc2.Version {
-			break
-		}
-		time.Sleep(s.interval)
-	}
-	log.Lvl1("Updated darc")
-
-	myvalue := []byte("1234")
-	ctx = ClientTransaction{
-		Instructions: []Instruction{{
-			InstanceID: InstanceID{
-				DarcID: s.darc.GetBaseID(),
-				SubID:  ZeroSubID,
-			},
-			Nonce:  GenNonce(),
-			Index:  0,
-			Length: 1,
-			Spawn: &Spawn{
-				ContractID: ContractValueID,
-				Args: []Argument{{
-					Name:  "value",
-					Value: myvalue,
-				}},
-			},
-		}},
-	}
-	require.Nil(t, ctx.Instructions[0].SignBy(s.signer))
-
-	var subID SubID
-	copy(subID[:], ctx.Instructions[0].Hash())
-	pr := s.sendTxAndWait(t, ctx, &InstanceID{darc2.GetBaseID(), subID})
-	require.True(t, pr.InclusionProof.Match())
-	values, err := pr.InclusionProof.RawValues()
-	require.Nil(t, err)
-	require.Equal(t, myvalue, values[0])
-}
-
 func darcToTx(t *testing.T, d2 darc.Darc, signer darc.Signer) ClientTransaction {
 	d2Buf, err := d2.ToProto()
 	require.Nil(t, err)

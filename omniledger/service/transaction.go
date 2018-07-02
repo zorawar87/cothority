@@ -80,7 +80,7 @@ type InstanceID struct {
 // NewInstanceID returns a new InstanceID given a slice of bytes.
 func NewInstanceID(buf []byte) InstanceID {
 	if len(buf) != 64 {
-		return InstanceID{}
+		return InstanceID{ZeroDarc, ZeroSubID}
 	}
 	return InstanceID{buf[0:32], NewSubID(buf[32:64])}
 }
