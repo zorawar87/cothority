@@ -827,6 +827,18 @@ func testViewChange(t *testing.T, nHosts, nFailures int) {
 
 	// TODO we need to bring the failed (the first nFailures) nodes back up
 	// and check that they can synchronise to the latest state.
+	log.Print("BEFORE SLEEP")
+	for i := 0; i < nFailures; i++ {
+		s.hosts[i].Unpause()
+		s.services[i].tryLoad()
+	}
+	time.Sleep(2 * s.interval)
+	log.Print("AFTER SLEEP")
+	for i := 0; i < nFailures; i++ {
+		pr = s.waitProofWithIdx(t, tx1.Instructions[0].InstanceID.Slice(), i)
+		require.True(t, pr.InclusionProof.Match())
+	}
+
 }
 
 func TestService_DarcToSc(t *testing.T) {

@@ -43,6 +43,7 @@ type DataHeader struct {
 // the proof needed for a key/value pair.
 type DataBody struct {
 	Transactions ClientTransactions
+	StateChanges StateChanges
 }
 
 // ***

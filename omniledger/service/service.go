@@ -383,7 +383,7 @@ func (s *Service) createNewBlock(scID skipchain.SkipBlockID, r *onet.Roster, cts
 	}
 
 	// Store transactions in the body
-	body := &DataBody{Transactions: ctsOK}
+	body := &DataBody{Transactions: ctsOK, StateChanges: scs}
 	sb.Payload, err = network.Marshal(body)
 	if err != nil {
 		return nil, errors.New("Couldn't marshal data: " + err.Error())
@@ -407,7 +407,7 @@ func (s *Service) createNewBlock(scID skipchain.SkipBlockID, r *onet.Roster, cts
 // Hence, we need to figure out when a new block is added. This can be done by
 // looking at the latest skipblock cache from Service.state.
 func (s *Service) updateCollectionCallback(sbID skipchain.SkipBlockID) error {
-	log.Lvlf4("%s: callback on %x", s.ServerIdentity(), sbID)
+	log.LLvlf4("%s: callback on %x", s.ServerIdentity(), sbID)
 	sb := s.db().GetByID(sbID)
 	if sb == nil {
 		panic("This should never happen because the callback runs " +
@@ -436,14 +436,13 @@ func (s *Service) updateCollectionCallback(sbID skipchain.SkipBlockID) error {
 		return errors.New("couldn't unmarshal body")
 	}
 
+	// TODO getCollection might change the collection state if the data
+	// needs to be loaded from boltdb.
 	log.Lvlf2("%s: Updating transactions for %x", s.ServerIdentity(), sb.SkipChainID())
 	cdb := s.getCollection(sb.SkipChainID())
-	_, _, _, scs, err := s.createStateChanges(cdb.coll, sb.SkipChainID(), body.Transactions, noTimeout)
-	if err != nil {
-		return err
-	}
+	scs := body.StateChanges
 
-	log.Lvlf3("%s: Storing %d state changes %v", s.ServerIdentity(), len(scs), scs.ShortStrings())
+	log.LLvlf3("%s: Storing %d state changes %v", s.ServerIdentity(), len(scs), scs.ShortStrings())
 	if err = cdb.StoreAll(scs); err != nil {
 		return err
 	}
@@ -473,16 +472,25 @@ func (s *Service) updateCollectionCallback(sbID skipchain.SkipBlockID) error {
 		s.heartbeats.start(string(sb.SkipChainID()), interval*rotationWindow, s.heartbeatsTimeout)
 	}
 
-	// if we are the new leader, then start polling
+	// If we are the new leader, then start polling. I we are already
+	// polling and we are not the leader anymore, then stop polling.
+	s.pollChanMut.Lock()
+	scIDStr := string(sb.SkipChainID())
 	if sb.Roster.List[0].Equal(s.ServerIdentity()) {
-		s.pollChanMut.Lock()
-		if _, ok := s.pollChan[string(sb.SkipChainID())]; !ok {
-			log.Lvlf2("%s: new leader started polling for %x", s.ServerIdentity(), sb.SkipChainID())
+		if _, ok := s.pollChan[scIDStr]; !ok {
+			log.LLvlf2("%s: new leader started polling for %x", s.ServerIdentity(), sb.SkipChainID())
 			s.pollChanWG.Add(1)
-			s.pollChan[string(sb.SkipChainID())] = s.startPolling(sb.SkipChainID(), interval)
+			s.pollChan[scIDStr] = s.startPolling(sb.SkipChainID(), interval)
 		}
-		s.pollChanMut.Unlock()
+	} else {
+		if _, ok := s.pollChan[scIDStr]; ok {
+			log.LLvlf2("%s: stopping to poll for %x", s.ServerIdentity(), sb.SkipChainID())
+			c := s.pollChan[scIDStr]
+			close(c)
+			delete(s.pollChan, scIDStr)
+		}
 	}
+	s.pollChanMut.Unlock()
 
 	// If we are adding a genesis block, then look into it for the darc ID
 	// and add it to the darcToSc hash map.
@@ -609,14 +617,16 @@ func (s *Service) startPolling(scID skipchain.SkipBlockID, interval time.Duratio
 				}
 
 				log.Lvl3("Starting new block", sb.Index+1)
-				leader, err := s.getLeader(scID)
-				if err != nil {
-					panic("getLeader should not return an error if roster is initialised.")
-				}
-				if !leader.Equal(s.ServerIdentity()) {
-					panic("startPolling should always be called by the leader," +
-						" if it isn't, then it did not start or shutdown properly.")
-				}
+				/*
+					leader, err := s.getLeader(scID)
+					if err != nil {
+						panic("getLeader should not return an error if roster is initialised.")
+					}
+					if !leader.Equal(s.ServerIdentity()) {
+						panic("startPolling should always be called by the leader," +
+							" if it isn't, then it did not start or shutdown properly.")
+					}
+				*/
 				tree := sb.Roster.GenerateNaryTree(len(sb.Roster.List))
 
 				proto, err := s.CreateProtocol(collectTxProtocol, tree)
@@ -686,7 +696,7 @@ func (s *Service) startPolling(scID skipchain.SkipBlockID, interval time.Duratio
 					log.Error("couldn't create new block: " + err.Error())
 				}
 			case <-closeSignal:
-				log.Lvl2(s.ServerIdentity(), "stopping polling")
+				log.LLvl2(s.ServerIdentity(), "stopping polling")
 				return
 			}
 		}
@@ -883,22 +893,29 @@ func (s *Service) getTxs(leader *network.ServerIdentity, roster *onet.Roster, sc
 	// an invalid latestID, but our current implementation assumes that the
 	// leader cannot be byzantine (i.e., it can only exhibit crash
 	// failure).
-	ourLatest, err := s.db().GetLatestByID(scID)
-	if err != nil {
-		log.Warn(s.ServerIdentity(), "we do not know about the skipchain ID")
+	if err := s.syncChain(roster, scID, latestID); err != nil {
+		log.Error(s.ServerIdentity, err)
 		return []ClientTransaction{}
 	}
-	latestSB := s.db().GetByID(latestID)
-	if latestSB == nil {
-		log.Lvl3(s.ServerIdentity(), "chain is out of date")
-		if err := s.skService().SyncChain(roster, ourLatest.Hash); err != nil {
-			log.Error(s.ServerIdentity(), err)
-		}
-	} else {
-		log.Lvl3(s.ServerIdentity(), "chain is up to date")
-	}
-
 	return s.txBuffer.take(string(scID))
+}
+
+// syncChain tries to synchronise up to the target skipblock for the skipchain
+// identified by scID. If we do not know the target or it is nil, then
+// synchronise, otherwise do nothing.
+func (s *Service) syncChain(roster *onet.Roster, scID skipchain.SkipBlockID, target skipchain.SkipBlockID) error {
+	ourLatest, err := s.db().GetLatestByID(scID)
+	if err != nil {
+		return fmt.Errorf("we do not know about the skipchain ID: %x (%s)", scID, err)
+	}
+	latestSB := s.db().GetByID(target)
+	if latestSB == nil {
+		log.Print(s.ServerIdentity(), "SYNC CHAIN")
+		if err := s.skService().SyncChain(roster, ourLatest.Hash); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // TestClose closes the go-routines that are polling for transactions. It is
@@ -1105,6 +1122,19 @@ func (s *Service) tryLoad() error {
 		waitChannels: make(map[string]chan bool),
 	}
 
+	/*
+		// Load all the skipchains and try to sync them.
+		for _, gen := range gasr.IDs {
+			sb, err := s.db().GetLatestByID(gen)
+			if err != nil {
+				return err
+			}
+			if err := s.syncChain(sb.Roster, gen, sb.Hash); err != nil {
+				return err
+			}
+		}
+	*/
+
 	// NOTE: Usually tryLoad is only called when services start up. but for
 	// testing, we might re-initialise the service. So we need to clean up
 	// the go-routines.
@@ -1112,16 +1142,24 @@ func (s *Service) tryLoad() error {
 
 	// Recreate the polling channles.
 	s.pollChanMut.Lock()
-	defer s.pollChanMut.Unlock()
 	s.pollChan = make(map[string]chan bool)
+	s.pollChanMut.Unlock()
 
 	gas := &skipchain.GetAllSkipChainIDs{}
 	gasr, err := s.skService().GetAllSkipChainIDs(gas)
 	if err != nil {
 		return err
 	}
-
 	for _, gen := range gasr.IDs {
+		latest, err := s.db().GetLatestByID(gen)
+		if err != nil {
+			return err
+		}
+		if err := s.syncChain(latest.Roster, gen, nil); err != nil {
+			// it's ok to fail because we're the very first node
+			log.Warn(s.ServerIdentity(), err)
+		}
+
 		if !s.isOurChain(gen) {
 			continue
 		}
@@ -1135,8 +1173,10 @@ func (s *Service) tryLoad() error {
 			panic("getLeader should not return an error if roster is initialised.")
 		}
 		if leader.Equal(s.ServerIdentity()) {
+			s.pollChanMut.Lock()
 			s.pollChanWG.Add(1)
 			s.pollChan[string(gen)] = s.startPolling(gen, interval)
+			s.pollChanMut.Unlock()
 		}
 		sb, err := s.db().GetLatestByID(gen)
 		if err != nil {
