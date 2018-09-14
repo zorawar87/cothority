@@ -20,7 +20,7 @@ go test -p 1 ./...
             container('maven') {
                 stage('mvn test') {
                     sh """
-eval "$(curl -sL https://raw.githubusercontent.com/travis-ci/gimme/master/gimme | GIMME_GO_VERSION=1.11 bash)"
+eval "\$(curl -sL https://raw.githubusercontent.com/travis-ci/gimme/master/gimme | GIMME_GO_VERSION=1.11 bash)"
 go get github.com/dedis/Coding || true
 make test_java
                     """
