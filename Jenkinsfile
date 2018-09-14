@@ -10,6 +10,8 @@ podTemplate(label: label, containers: [
             container('golang') {
                 stage('go test') {
                     sh """
+env
+eval "\$(curl -sL https://raw.githubusercontent.com/travis-ci/gimme/master/gimme | GIMME_GO_VERSION=1.11 bash)"
 go test -p 1 ./...
                     """
                 }
