@@ -798,7 +798,7 @@ func bcStore(c *cli.Context) error {
 	log.Info("Storing InstanceID in pop-service")
 	iid := inst.DeriveID("")
 	for _, c := range cfg.Roster.List {
-		err = service.NewClient().StoreInstanceID(c.Address, finalID, iid)
+		err = service.NewClient().StoreInstanceID(c.Address, finalID, iid, orgDarc.GetBaseID())
 		if err != nil {
 			log.Error("couldn't store instanceID: " + err.Error())
 		}
@@ -845,7 +845,7 @@ func bcFinalize(c *cli.Context) error {
 		}
 		return errors.New("didn't find final statement")
 	}
-	if fs.Signature == nil || len(fs.Attendees) == 0 {
+	if fs.Signature == nil || len(fs.Signature) == 0 || len(fs.Attendees) == 0 {
 		log.Infof("%+v", fs)
 		return errors.New("proposed configuration not finalized")
 	}
@@ -854,7 +854,7 @@ func bcFinalize(c *cli.Context) error {
 		return errors.New("couldn't encode final statement: " + err.Error())
 	}
 
-	partyInstance, err := cl.GetInstanceID(cfg.Roster.List[0].Address, partyID)
+	partyInstance, darcID, err := cl.GetInstanceID(cfg.Roster.List[0].Address, partyID)
 	if err != nil {
 		return errors.New("couldn't get instanceID: " + err.Error())
 	}
@@ -871,6 +871,7 @@ func bcFinalize(c *cli.Context) error {
 	ctx := byzcoin.ClientTransaction{
 		Instructions: byzcoin.Instructions{byzcoin.Instruction{
 			InstanceID: partyInstance,
+			Nonce:      byzcoin.Nonce{},
 			Index:      0,
 			Length:     1,
 			Invoke: &byzcoin.Invoke{
@@ -887,7 +888,7 @@ func bcFinalize(c *cli.Context) error {
 			},
 		}},
 	}
-	err = ctx.Instructions[0].SignBy(cfg.GenesisDarc.GetBaseID(), *signer)
+	err = ctx.Instructions[0].SignBy(darcID, *signer)
 	if err != nil {
 		return errors.New("couldn't sign instruction: " + err.Error())
 	}
@@ -967,7 +968,7 @@ func bcCoinShow(c *cli.Context) error {
 	if err != nil {
 		return errors.New("couldn't unmarshal coin balance: " + err.Error())
 	}
-	log.Info("Coin value is: ", ci.Value)
+	log.Info("Coin balance is: ", ci.Value)
 	return nil
 }
 

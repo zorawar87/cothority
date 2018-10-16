@@ -131,6 +131,8 @@ type saveData struct {
 	Finals map[string]*FinalStatement
 	// InstanceIDs stores a map of partyID to InstanceID
 	InstanceIDs map[string]*byzcoin.InstanceID
+	// DarcIDs stores a map of partyID to DarcID
+	DarcIDs map[string]*darc.ID
 	// Signers stores a map of partyID to Signer
 	Signers map[string]*darc.Signer
 	// The info used in merge process
@@ -454,6 +456,7 @@ func (s *Service) GetKeys(req *GetKeys) (*GetKeysReply, error) {
 // StoreInstanceID will store the instanceID in a given final statement
 func (s *Service) StoreInstanceID(req *StoreInstanceID) (*StoreInstanceIDReply, error) {
 	s.data.InstanceIDs[string(req.PartyID)] = &req.InstanceID
+	s.data.DarcIDs[string(req.PartyID)] = &req.DarcID
 	s.save()
 	return &StoreInstanceIDReply{}, nil
 }
@@ -464,7 +467,11 @@ func (s *Service) GetInstanceID(req *GetInstanceID) (*GetInstanceIDReply, error)
 	if !ok {
 		return nil, errors.New("no such instanceID stored")
 	}
-	return &GetInstanceIDReply{*iid}, nil
+	did, ok := s.data.DarcIDs[string(req.PartyID)]
+	if !ok {
+		return nil, errors.New("no such darcID stored")
+	}
+	return &GetInstanceIDReply{*iid, *did}, nil
 }
 
 // StoreSigner will store the Signer in a given final statement
@@ -1159,6 +1166,9 @@ func newService(c *onet.Context) (onet.Service, error) {
 	}
 	if len(s.data.InstanceIDs) == 0 {
 		s.data.InstanceIDs = map[string]*byzcoin.InstanceID{}
+	}
+	if len(s.data.DarcIDs) == 0 {
+		s.data.DarcIDs = map[string]*darc.ID{}
 	}
 	if len(s.data.Signers) == 0 {
 		s.data.Signers = map[string]*darc.Signer{}
