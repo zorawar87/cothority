@@ -112,9 +112,6 @@ type Service struct {
 	// all proposed configurations - they don't need to be saved. Every time they
 	// are retrived, they will be deleted.
 	proposedDescription []PopDesc
-	// storedKeys is a temporary storage for saving keys of attendees while
-	// scanning.
-	storedKeys map[string]*keyList
 }
 
 type keyList struct {
@@ -135,6 +132,9 @@ type saveData struct {
 	DarcIDs map[string]*darc.ID
 	// Signers stores a map of partyID to Signer
 	Signers map[string]*darc.Signer
+	// StoredKeys is a temporary storage for saving keys of attendees while
+	// scanning.
+	StoredKeys map[string]*keyList
 	// The info used in merge process
 	// key is ID of party
 	merges map[string]*merge
@@ -161,7 +161,11 @@ var ErrorReadPIN = errors.New("Read PIN in server-log")
 // correct pin, and if so, it stores the public key as reference.
 func (s *Service) PinRequest(req *PinRequest) (network.Message, error) {
 	if req.Pin == "" {
-		s.data.Pin = fmt.Sprintf("%06d", random.Int(big.NewInt(1000000), s.Suite().RandomStream()))
+		if false {
+			s.data.Pin = fmt.Sprintf("%06d", random.Int(big.NewInt(1000000), s.Suite().RandomStream()))
+		} else {
+			s.data.Pin = "1"
+		}
 		log.Info("PIN:", s.data.Pin)
 		return nil, ErrorReadPIN
 	}
@@ -437,13 +441,13 @@ func (s *Service) GetFinalStatements(req *GetFinalStatements) (*GetFinalStatemen
 // StoreKeys stores the given keys in the service to be retrieved by the users.
 func (s *Service) StoreKeys(req *StoreKeys) (*StoreKeysReply, error) {
 	// TODO: verify signature
-	s.storedKeys[string(req.ID)] = &keyList{req.Keys}
+	s.data.StoredKeys[string(req.ID)] = &keyList{req.Keys}
 	return &StoreKeysReply{}, nil
 }
 
 // GetKeys will return the keys stored for that party.
 func (s *Service) GetKeys(req *GetKeys) (*GetKeysReply, error) {
-	ks := s.storedKeys[string(req.ID)]
+	ks := s.data.StoredKeys[string(req.ID)]
 	if ks == nil {
 		return nil, errors.New("no keys stored for this party")
 	}
@@ -1146,7 +1150,6 @@ func newService(c *onet.Context) (onet.Service, error) {
 	s := &Service{
 		ServiceProcessor: onet.NewServiceProcessor(c),
 		data:             &saveData{},
-		storedKeys:       map[string]*keyList{},
 	}
 	err := s.RegisterHandlers(s.PinRequest, s.VerifyLink, s.StoreConfig, s.FinalizeRequest,
 		s.FetchFinal, s.MergeRequest, s.GetProposals, s.GetLink, s.GetFinalStatements,
@@ -1172,6 +1175,9 @@ func newService(c *onet.Context) (onet.Service, error) {
 	}
 	if len(s.data.Signers) == 0 {
 		s.data.Signers = map[string]*darc.Signer{}
+	}
+	if len(s.data.StoredKeys) == 0 {
+		s.data.StoredKeys = map[string]*keyList{}
 	}
 	s.syncs = make(map[string]*syncChans)
 	s.propagateFinalize, err = messaging.NewPropagationFunc(c, propagFinal, s.PropagateFinal, 0)

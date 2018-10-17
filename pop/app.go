@@ -789,7 +789,11 @@ func bcStore(c *cli.Context) error {
 	ct = byzcoin.ClientTransaction{
 		Instructions: byzcoin.Instructions{inst},
 	}
-	log.Info("Contacting ByzCoin to spawn the new party")
+	fsID, err := finalStatement.Hash()
+	if err != nil {
+		return err
+	}
+	log.Infof("Contacting ByzCoin to spawn the new party with id %x", fsID)
 	_, err = olc.AddTransactionAndWait(ct, 10)
 	if err != nil {
 		return err
