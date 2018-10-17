@@ -902,11 +902,39 @@ func bcFinalize(c *cli.Context) error {
 		return errors.New("error while sending transaction: " + err.Error())
 	}
 
+	iid := sha256.New()
+	iid.Write(ctx.Instructions[0].InstanceID.Slice())
+	pubBuf, err := signer.Ed25519.Point.MarshalBinary()
+	if err != nil {
+		return errors.New("couldn't marshal public key: " + err.Error())
+	}
+	iid.Write(pubBuf)
+	p, err := ocl.GetProof(iid.Sum(nil))
+	if err != nil {
+		return errors.New("couldn't calculate service coin address: " + err.Error())
+	}
+	_, values, err := p.Proof.KeyValue()
+	if err != nil {
+		return errors.New("proof was invalid: " + err.Error())
+	}
+	p, err = ocl.GetProof(values[2])
+	if err != nil {
+		return errors.New("couldn't get proof for service-darc: " + err.Error())
+	}
+	_, values, err = p.Proof.KeyValue()
+	if err != nil {
+		return errors.New("service-darc proof is invalid: " + err.Error())
+	}
+	serviceDarc, err := darc.NewFromProtobuf(values[0])
+	if err != nil {
+		return errors.New("got invalid service-darc: " + err.Error())
+	}
+
 	err = ph.NewClient().LinkPoP(fs.Desc.Roster.List[0], ph.Party{
 		ByzCoinID:      cfg.ByzCoinID,
 		FinalStatement: *fs,
 		InstanceID:     partyInstance,
-		Darc:           cfg.GenesisDarc,
+		Darc:           *serviceDarc,
 		Signer:         *signer,
 	})
 	if err != nil {
