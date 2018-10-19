@@ -109,8 +109,8 @@ type Service struct {
 	// verifyMergeBuffer is a temporary buffer for bftVerifyMerge results.
 	// The logic is the same for verifyFinalBuffer above.
 	verifyMergeBuffer sync.Map
-	// all proposed configurations - they don't need to be saved. Every time they
-	// are retrived, they will be deleted.
+	// all proposed configurations - they don't need to be saved. Every time
+	// a party is finalized, they are deleted.
 	proposedDescription []PopDesc
 }
 
@@ -249,7 +249,6 @@ func (s *Service) StoreConfig(req *StoreConfig) (network.Message, error) {
 // GetProposals returns all collected proposals so far.
 func (s *Service) GetProposals(req *GetProposals) (*GetProposalsReply, error) {
 	tmp := s.proposedDescription
-	s.proposedDescription = make([]PopDesc, 0)
 	log.Lvlf2("Sending proposals: %+v", tmp)
 	return &GetProposalsReply{
 		Proposals: tmp,
@@ -260,6 +259,7 @@ func (s *Service) GetProposals(req *GetProposals) (*GetProposalsReply, error) {
 // a PopDesc and signed off. The FinalStatement holds the updated PopDesc, the
 // pruned attendees-public-key-list and the collective signature.
 func (s *Service) FinalizeRequest(req *FinalizeRequest) (*FinalizeResponse, error) {
+	s.proposedDescription = make([]PopDesc, 0)
 	log.Lvlf2("Finalize: %s %+v", s.Context.ServerIdentity(), req)
 	if s.data.Public == nil {
 		return nil, errors.New("Not linked yet")

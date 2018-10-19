@@ -941,6 +941,7 @@ func bcFinalize(c *cli.Context) error {
 		return errors.New("couldn't store in personhood service: " + err.Error())
 	}
 
+	log.Infof("Finalized party %x with instance-id %x", partyID, partyInstance)
 	return nil
 }
 
