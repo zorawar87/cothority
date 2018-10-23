@@ -985,7 +985,6 @@ func (s *Service) createStateChanges(coll *collection.Collection, scID skipchain
 	var err error
 	merkleRoot, txOut, states, err = s.stateChangeCache.get(scID, txIn.Hash())
 	if err == nil {
-		s.stateChangeCache.update(scID, nil, nil, TxResults{}, StateChanges{})
 		log.Lvl3(s.ServerIdentity(), "loaded state changes from cache")
 		return
 	}
