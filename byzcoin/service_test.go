@@ -649,7 +649,7 @@ func TestService_InvalidVerification(t *testing.T) {
 	defer s.local.CloseAll()
 
 	for i := range s.hosts {
-		RegisterContract(s.hosts[i], "panic", panicContractFunc)
+		RegisterContract(s.hosts[i], "panic", adaptor(panicContractFunc))
 	}
 
 	// tx0 uses the panicing contract, so it should _not_ be stored.
@@ -780,7 +780,7 @@ func TestService_StateChange(t *testing.T) {
 		}
 		return nil, nil, errors.New("need spawn or invoke")
 	}
-	RegisterContract(s.hosts[0], "add", f)
+	RegisterContract(s.hosts[0], "add", adaptor(f))
 
 	cdb, err := s.service().getStateTrie(s.genesis.SkipChainID())
 	require.NoError(t, err)
@@ -1633,7 +1633,7 @@ func TestService_StateChangeCache(t *testing.T) {
 		ctr++
 		return []StateChange{}, []Coin{}, nil
 	}
-	s.service().registerContract(contractID, contract)
+	s.service().registerContract(contractID, adaptor(contract))
 
 	scID := s.genesis.SkipChainID()
 	st, err := s.service().getStateTrie(scID)
@@ -1718,7 +1718,7 @@ func TestService_StateChangeStorage(t *testing.T) {
 		return []StateChange{sc1, sc2, sc3}, []Coin{}, nil
 	}
 	for _, s := range s.hosts {
-		RegisterContract(s, contractID, contract)
+		RegisterContract(s, contractID, adaptor(contract))
 	}
 
 	for i := 0; i < n; i++ {
@@ -1808,7 +1808,7 @@ func TestService_StateChangeCatchUp(t *testing.T) {
 		return []StateChange{sc1}, []Coin{}, nil
 	}
 	for _, s := range s.hosts {
-		RegisterContract(s, contractID, contract)
+		RegisterContract(s, contractID, adaptor(contract))
 	}
 
 	createTx := func(iid []byte, counter uint64, wait int) *Instruction {
@@ -2087,6 +2087,30 @@ func newSerN(t *testing.T, step int, interval time.Duration, n int, viewchange b
 	return s
 }
 
+type contractAdaptor struct {
+	BasicContract
+	cb func(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error)
+}
+
+func (ca *contractAdaptor) Spawn(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
+	return ca.cb(cdb, inst, c)
+}
+
+func (ca *contractAdaptor) Invoke(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
+	return ca.cb(cdb, inst, c)
+}
+
+func (ca *contractAdaptor) Delete(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
+	return ca.cb(cdb, inst, c)
+}
+
+// adaptor turns an old-style contract callback into a new-style contract.
+func adaptor(cb func(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error)) func([]byte) (Contract, error) {
+	return func([]byte) (Contract, error) {
+		return &contractAdaptor{cb: cb}, nil
+	}
+}
+
 func invalidContractFunc(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error) {
 	return nil, nil, errors.New("this invalid contract always returns an error")
 }
@@ -2131,9 +2155,9 @@ func registerDummy(servers []*onet.Server) {
 	// For testing - there must be a better way to do that. But putting
 	// services []skipchain.GetService in the method signature doesn't work :(
 	for _, s := range servers {
-		RegisterContract(s, dummyContract, dummyContractFunc)
-		RegisterContract(s, slowContract, slowContractFunc)
-		RegisterContract(s, invalidContract, invalidContractFunc)
+		RegisterContract(s, dummyContract, adaptor(dummyContractFunc))
+		RegisterContract(s, slowContract, adaptor(slowContractFunc))
+		RegisterContract(s, invalidContract, adaptor(invalidContractFunc))
 	}
 }
 

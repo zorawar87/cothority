@@ -1643,17 +1643,17 @@ func (s *Service) executeInstruction(st ReadOnlyStateTrie, cin []Coin, instr Ins
 		}
 	}()
 
-	_, _, contractID, _, err := st.GetValues(instr.InstanceID.Slice())
+	contents, _, contractID, _, err := st.GetValues(instr.InstanceID.Slice())
 	if err != errKeyNotSet && err != nil {
 		err = errors.New("Couldn't get contract type of instruction: " + err.Error())
 		return
 	}
 
-	contract, exists := s.contracts[contractID]
+	contractFactory, exists := s.contracts[contractID]
 	if !exists && ConfigInstanceID.Equal(instr.InstanceID) {
 		// Special case: first time call to genesis-configuration must return
 		// correct contract type.
-		contract, exists = s.contracts[ContractConfigID]
+		contractFactory, exists = s.contracts[ContractConfigID]
 	}
 
 	// If the leader does not have a verifier for this contract, it drops the
@@ -1664,9 +1664,20 @@ func (s *Service) executeInstruction(st ReadOnlyStateTrie, cin []Coin, instr Ins
 	}
 	// Now we call the contract function with the data of the key.
 	log.Lvlf3("%s Calling contract '%s'", s.ServerIdentity(), contractID)
-	scs, cout, err = contract(st, instr, ctxHash, cin)
+
+	c, err := contractFactory(contents)
 	if err != nil {
-		return
+		return nil, nil, err
+	}
+	switch instr.GetType() {
+	case SpawnType:
+		scs, cout, err = c.Spawn(st, instr, cin)
+	case InvokeType:
+		scs, cout, err = c.Invoke(st, instr, cin)
+	case DeleteType:
+		scs, cout, err = c.Delete(st, instr, cin)
+	default:
+		return nil, nil, errors.New("unexpected contract type")
 	}
 
 	// As the InstanceID of each sc is not necessarily the same as the
@@ -2152,8 +2163,9 @@ func newService(c *onet.Context) (onet.Service, error) {
 	}
 	s.RegisterProcessorFunc(viewChangeMsgID, s.handleViewChangeReq)
 
-	s.registerContract(ContractConfigID, s.ContractConfig)
-	s.registerContract(ContractDarcID, s.ContractDarc)
+	s.registerContract(ContractConfigID, contractConfigFromBytes)
+	s.registerContract(ContractDarcID, s.contractDarcFromBytes)
+
 	skipchain.RegisterVerification(c, verifyByzCoin, s.verifySkipBlock)
 	if _, err := s.ProtocolRegister(collectTxProtocol, NewCollectTxProtocol(s.getTxs)); err != nil {
 		return nil, err
