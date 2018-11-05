@@ -173,7 +173,7 @@ func (s *ts) addRead(t *testing.T, write *byzcoin.Proof, Xc kyber.Point, ctr uin
 		Instructions: byzcoin.Instructions{{
 			InstanceID: byzcoin.NewInstanceID(write.InclusionProof.Key()),
 			Spawn: &byzcoin.Spawn{
-				ContractID: ContractReadID,
+				ContractID: contractReadID,
 				Args:       byzcoin.Arguments{{Name: "read", Value: readBuf}},
 			},
 			SignerCounter: []uint64{ctr},
@@ -218,7 +218,7 @@ func newTS(t *testing.T, nodes int) ts {
 func (s *ts) createGenesis(t *testing.T) {
 	var err error
 	s.genesisMsg, err = byzcoin.DefaultGenesisMsg(byzcoin.CurrentVersion, s.roster,
-		[]string{"spawn:" + ContractWriteID, "spawn:" + ContractReadID}, s.signer.Identity())
+		[]string{"spawn:" + ContractWriteID, "spawn:" + contractReadID}, s.signer.Identity())
 	require.Nil(t, err)
 	s.gDarc = &s.genesisMsg.GenesisDarc
 	s.genesisMsg.BlockInterval = time.Second

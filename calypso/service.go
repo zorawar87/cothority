@@ -119,7 +119,7 @@ func (s *Service) DecryptKey(dkr *DecryptKey) (reply *DecryptKeyReply, err error
 	log.Lvl2("Re-encrypt the key to the public key of the reader")
 
 	var read Read
-	if err := dkr.Read.VerifyAndDecode(cothority.Suite, ContractReadID, &read); err != nil {
+	if err := dkr.Read.VerifyAndDecode(cothority.Suite, contractReadID, &read); err != nil {
 		return nil, errors.New("didn't get a read instance: " + err.Error())
 	}
 	var write Write
@@ -266,7 +266,7 @@ func (s *Service) verifyReencryption(rc *protocol.Reencrypt) bool {
 		if err != nil {
 			return errors.New("proof cannot return values: " + err.Error())
 		}
-		if contractID != ContractReadID {
+		if contractID != contractReadID {
 			return errors.New("proof doesn't point to read instance")
 		}
 		var r Read
@@ -299,8 +299,7 @@ func newService(c *onet.Context) (onet.Service, error) {
 	if err := s.RegisterHandlers(s.CreateLTS, s.DecryptKey, s.SharedPublic); err != nil {
 		return nil, errors.New("couldn't register messages")
 	}
-	byzcoin.RegisterContract(c, ContractWriteID, s.ContractWrite)
-	byzcoin.RegisterContract(c, ContractReadID, s.ContractRead)
+	byzcoin.RegisterContract(c, ContractWriteID, s.contractWrite)
 	if err := s.tryLoad(); err != nil {
 		log.Error(err)
 		return nil, err

@@ -148,7 +148,7 @@ func (c *Client) AddRead(proof *byzcoin.Proof, signer darc.Signer, signerCtr uin
 		Instructions: byzcoin.Instructions{{
 			InstanceID: byzcoin.NewInstanceID(proof.InclusionProof.Key()),
 			Spawn: &byzcoin.Spawn{
-				ContractID: ContractReadID,
+				ContractID: contractReadID,
 				Args:       byzcoin.Arguments{{Name: "read", Value: readBuf}},
 			},
 			SignerCounter: []uint64{signerCtr},
@@ -171,7 +171,7 @@ func (c *Client) AddRead(proof *byzcoin.Proof, signer darc.Signer, signerCtr uin
 //   - signer - The signer authorizing the spawn of this darc (calypso "admin")
 //   - signerCtr - A monotonically increaing counter for every signer
 //   - controlDarc - The darc governing this spawning
-//	 - spawnDarc - The darc to be spawned
+//   - spawnDarc - The darc to be spawned
 //   - wait - The number of blocks to wait -- 0 means no wait
 //
 // Output:

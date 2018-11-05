@@ -28,12 +28,12 @@ func TestClient_CreateLTS(t *testing.T) {
 	// The darc inside it should be valid.
 	d := msg.GenesisDarc
 	require.Nil(t, d.Verify(true))
-	//Create Ledger
+	// Create Ledger
 	c, _, err := byzcoin.NewLedger(msg, false)
 	require.Nil(t, err)
-	//Create a Calypso Client (Byzcoin + Onet)
+	// Create a Calypso Client (Byzcoin + Onet)
 	calypsoClient := NewClient(c)
-	//Invoke CreateLTS
+	// Invoke CreateLTS
 	ltsReply, err := calypsoClient.CreateLTS()
 	require.Nil(t, err)
 	require.NotNil(t, ltsReply.LTSID)
@@ -63,25 +63,25 @@ func TestClient_Calypso(t *testing.T) {
 	// The darc inside it should be valid.
 	gDarc := msg.GenesisDarc
 	require.Nil(t, gDarc.Verify(true))
-	//Create Ledger
+	// Create Ledger
 	c, _, err := byzcoin.NewLedger(msg, false)
 	require.Nil(t, err)
-	//Create a Calypso Client (Byzcoin + Onet)
+	// Create a Calypso Client (Byzcoin + Onet)
 	calypsoClient := NewClient(c)
 
-	//Create the LTS
+	// Create the LTS
 	ltsReply, err := calypsoClient.CreateLTS()
 	require.Nil(t, err)
-	//If no error, assign it
+	// If no error, assign it
 	calypsoClient.ltsReply = ltsReply
 
-	//Create a signer, darc for data point #1
+	// Create a signer, darc for data point #1
 	darc1 := darc.NewDarc(darc.InitRules([]darc.Identity{provider1.Identity()},
 		[]darc.Identity{provider1.Identity()}), []byte("Provider1"))
 	// provider1 is the owner, while reader1 is allowed to do read
 	darc1.Rules.AddRule(darc.Action("spawn:"+ContractWriteID),
 		expression.InitOrExpr(provider1.Identity().String()))
-	darc1.Rules.AddRule(darc.Action("spawn:"+ContractReadID),
+	darc1.Rules.AddRule(darc.Action("spawn:"+contractReadID),
 		expression.InitOrExpr(reader1.Identity().String()))
 	require.NotNil(t, darc1)
 	require.Nil(t, err)
@@ -94,21 +94,21 @@ func TestClient_Calypso(t *testing.T) {
 	// provider1 is the owner, while reader1 is allowed to do read
 	darc2.Rules.AddRule(darc.Action("spawn:"+ContractWriteID),
 		expression.InitOrExpr(provider2.Identity().String()))
-	darc2.Rules.AddRule(darc.Action("spawn:"+ContractReadID),
+	darc2.Rules.AddRule(darc.Action("spawn:"+contractReadID),
 		expression.InitOrExpr(reader2.Identity().String()))
 	//Spawn it
 	_, err = calypsoClient.SpawnDarc(admin, 2, gDarc, *darc2, 10)
 	require.Nil(t, err)
-	//Create a secret key
+	// Create a secret key
 	key1 := []byte("secret key 1")
-	//Create a Write instance
+	// Create a Write instance
 	write1 := NewWrite(cothority.Suite, calypsoClient.ltsReply.LTSID,
 		darc1.GetBaseID(), calypsoClient.ltsReply.X, key1)
 	//Write it to calypso
 	wr1, err := calypsoClient.AddWrite(write1, provider1, 1, *darc1, 10)
 	require.Nil(t, err)
 	require.NotNil(t, wr1.InstanceID)
-	//Get the write proof
+	// Get the write proof
 	prWr1, err := calypsoClient.WaitProof(wr1.InstanceID, time.Second, nil)
 	require.Nil(t, err)
 	require.NotNil(t, prWr1)
@@ -120,7 +120,7 @@ func TestClient_Calypso(t *testing.T) {
 	require.True(t, prRe1.InclusionProof.Match(re1.InstanceID.Slice()))
 
 	key2 := []byte("secret key 2")
-	//Create a Write instance
+	// Create a Write instance
 	write2 := NewWrite(cothority.Suite, calypsoClient.ltsReply.LTSID,
 		darc2.GetBaseID(), calypsoClient.ltsReply.X, key2)
 	wr2, err := calypsoClient.AddWrite(write2, provider2, 1, *darc2, 10)
