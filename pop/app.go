@@ -715,6 +715,9 @@ func bcStore(c *cli.Context) error {
 	for _, s := range cfg.Roster.List {
 		log.Info("Contacting", s)
 		link, err := service.NewClient().GetLink(s.Address)
+		if link == nil {
+			return errors.New("didn't find public key in node: " + s.String())
+		}
 		if err != nil {
 			return errors.New("need all public keys of all organizers: " + err.Error())
 		}
