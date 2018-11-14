@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -15,8 +17,11 @@ import (
 	"github.com/dedis/cothority/byzcoin/bcadmin/lib"
 	"github.com/dedis/cothority/byzcoin/contracts"
 	"github.com/dedis/cothority/darc"
+	"github.com/dedis/cothority/darc/expression"
 	"github.com/dedis/kyber"
+	"github.com/dedis/kyber/util/encoding"
 	"github.com/dedis/kyber/util/key"
+	"github.com/dedis/onet"
 	"github.com/dedis/onet/cfgpath"
 	"github.com/dedis/onet/log"
 	"github.com/dedis/onet/network"
@@ -243,24 +248,163 @@ func coinHash(pub kyber.Point) (iid byzcoin.InstanceID, err error) {
 
 const configName = "wallet.json"
 
+type SIJSON struct {
+	Public      string
+	ID          string
+	Address     string
+	Description string
+}
+
+type RosterJSON struct {
+	ID        string
+	List      []SIJSON
+	Aggregate string
+}
+
+type RuleJSON struct {
+	Action     string
+	Expression string
+}
+
+type DarcJSON struct {
+	Version     uint64
+	Description string
+	BaseID      string
+	PrevID      string
+	Rules       []RuleJSON
+}
+
+type BCConfigJSON struct {
+	Roster        RosterJSON
+	ByzCoinID     string
+	GenesisDarc   DarcJSON
+	AdminIdentity string
+}
+
+type KeyPairJSON struct {
+	Public  string
+	Private string
+}
+
+type ConfigJSON struct {
+	ByzcoinConfig BCConfigJSON
+	KeyPair       KeyPairJSON
+}
+
 // TODO: make json
 func LoadConfig() (cfg Config, cl *byzcoin.Client, err error) {
 	buf, err := ioutil.ReadFile(filepath.Join(ConfigPath, configName))
 	if err != nil {
 		return
 	}
-	err = protobuf.DecodeWithConstructors(buf, &cfg, network.DefaultConstructors(cothority.Suite))
+	cfgJSON := ConfigJSON{}
+	err = json.Unmarshal(buf, &cfgJSON)
 	if err != nil {
 		return
 	}
+	pub, err := encoding.StringHexToPoint(cothority.Suite, cfgJSON.KeyPair.Public)
+	if err != nil {
+		return
+	}
+	priv, err := encoding.StringHexToScalar(cothority.Suite, cfgJSON.KeyPair.Private)
+	if err != nil {
+		return
+	}
+	cfg.KeyPair = key.Pair{
+		Public:  pub,
+		Private: priv,
+	}
+
+	var list []*network.ServerIdentity
+	for _, siJ := range cfgJSON.ByzcoinConfig.Roster.List {
+		pub, err = encoding.StringHexToPoint(cothority.Suite, siJ.Public)
+		if err != nil {
+			return
+		}
+		si := network.NewServerIdentity(pub, network.Address(siJ.Address))
+		si.Description = siJ.Description
+		var id []byte
+		id, err = hex.DecodeString(siJ.ID)
+		if err != nil {
+			return
+		}
+		copy(si.ID[:], id)
+		list = append(list, si)
+	}
+	cfg.BCConfig.Roster = *onet.NewRoster(list)
+	cfg.BCConfig.ByzCoinID, err = hex.DecodeString(cfgJSON.ByzcoinConfig.ByzCoinID)
+	if err != nil {
+		return
+	}
+
+	dj := cfgJSON.ByzcoinConfig.GenesisDarc
+	cfg.BCConfig.GenesisDarc.Version = dj.Version
+	cfg.BCConfig.GenesisDarc.Description = []byte(dj.Description)
+	cfg.BCConfig.GenesisDarc.BaseID, err = hex.DecodeString(dj.BaseID)
+	if err != nil {
+		return
+	}
+	cfg.BCConfig.GenesisDarc.PrevID, err = hex.DecodeString(dj.PrevID)
+	if err != nil {
+		return
+	}
+	for _, rul := range dj.Rules {
+		cfg.BCConfig.GenesisDarc.Rules.List = append(cfg.BCConfig.GenesisDarc.Rules.List, darc.Rule{darc.Action(rul.Action), expression.Expr(rul.Expression)})
+	}
+
+	adminPub, err := encoding.StringHexToPoint(cothority.Suite, cfgJSON.ByzcoinConfig.AdminIdentity)
+	cfg.BCConfig.AdminIdentity.Ed25519 = &darc.IdentityEd25519{adminPub}
+
 	cl = byzcoin.NewClient(cfg.BCConfig.ByzCoinID, cfg.BCConfig.Roster)
 	return
 }
 
 func (cfg Config) Save() error {
-	buf, err := protobuf.Encode(&cfg)
+	kpPub, err := encoding.PointToStringHex(cothority.Suite, cfg.KeyPair.Public)
 	if err != nil {
 		return err
 	}
+	kpPriv, err := encoding.ScalarToStringHex(cothority.Suite, cfg.KeyPair.Private)
+	if err != nil {
+		return err
+	}
+
+	jr := RosterJSON{
+		ID:        fmt.Sprintf("%x", cfg.BCConfig.Roster.ID[:]),
+		Aggregate: cfg.BCConfig.Roster.Aggregate.String(),
+	}
+	for _, si := range cfg.BCConfig.Roster.List {
+		jr.List = append(jr.List, SIJSON{
+			Public:      si.Public.String(),
+			ID:          fmt.Sprintf("%x", si.ID[:]),
+			Address:     string(si.Address),
+			Description: si.Description,
+		})
+	}
+	d := cfg.BCConfig.GenesisDarc
+	jd := DarcJSON{
+		Version:     d.Version,
+		Description: string(d.Description),
+		BaseID:      fmt.Sprintf("%x", d.BaseID),
+		PrevID:      fmt.Sprintf("%x", d.PrevID),
+	}
+	for _, r := range d.Rules.List {
+		jd.Rules = append(jd.Rules, RuleJSON{
+			Action:     string(r.Action),
+			Expression: string(r.Expr),
+		})
+	}
+	cfgJSON := ConfigJSON{
+		KeyPair: KeyPairJSON{kpPub, kpPriv},
+		ByzcoinConfig: BCConfigJSON{
+			Roster:        jr,
+			ByzCoinID:     fmt.Sprintf("%x", cfg.BCConfig.ByzCoinID),
+			GenesisDarc:   jd,
+			AdminIdentity: cfg.BCConfig.AdminIdentity.Ed25519.Point.String(),
+		},
+	}
+
+	buf, err := json.MarshalIndent(cfgJSON, "", " ")
+
 	return ioutil.WriteFile(filepath.Join(ConfigPath, configName), buf, 0600)
 }

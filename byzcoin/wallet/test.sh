@@ -15,8 +15,17 @@ main(){
   build $APPDIR/../bcadmin
   rm -rf config wallet{1,2}
   mkdir wallet{1,2}
+  # run testLoadSave
   run testCoin
   stopTest
+}
+
+testLoadSave(){
+  rm -f config/*
+  runCoBG 1 2 3
+  testOK runBA create public.toml --interval .5s
+  bc=config/bc*cfg
+  testOK runWallet 1 join $bc
 }
 
 testCoin(){
