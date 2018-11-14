@@ -18,6 +18,7 @@ import (
 	"github.com/dedis/cothority/calypso/protocol"
 	"github.com/dedis/cothority/darc"
 	dkgprotocol "github.com/dedis/cothority/dkg/pedersen"
+	"github.com/dedis/cothority/skipchain"
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/share"
 	"github.com/dedis/kyber/util/random"
@@ -70,7 +71,14 @@ type vData struct {
 // This method will create a random LTSID that can be used to reference
 // the LTS group created.
 func (s *Service) CreateLTS(cl *CreateLTS) (reply *CreateLTSReply, err error) {
-	tree := cl.Roster.GenerateNaryTreeWithRoot(len(cl.Roster.List), s.ServerIdentity())
+	// TODO EVERYONE needs to do this check...
+	roster, err := s.getLtsRoster(cl.ByzCoinID, &cl.ByzCoinRoster, cl.InstanceID)
+	if err != nil {
+		return nil, err
+	}
+
+	// NOTE: the roster stored in ByzCoin must have myself.
+	tree := roster.GenerateNaryTreeWithRoot(len(roster.List), s.ServerIdentity())
 	pi, err := s.CreateProtocol(dkgprotocol.Name, tree)
 	setupDKG := pi.(*dkgprotocol.Setup)
 	setupDKG.Wait = true
@@ -81,7 +89,7 @@ func (s *Service) CreateLTS(cl *CreateLTS) (reply *CreateLTSReply, err error) {
 	if err := pi.Start(); err != nil {
 		return nil, err
 	}
-	log.Lvl3("Started DKG-protocol - waiting for done", len(cl.Roster.List))
+	log.Lvl3("Started DKG-protocol - waiting for done", len(roster.List))
 	select {
 	case <-setupDKG.Finished:
 		shared, err := setupDKG.SharedSecret()
@@ -96,8 +104,8 @@ func (s *Service) CreateLTS(cl *CreateLTS) (reply *CreateLTSReply, err error) {
 			return nil, err
 		}
 		s.storage.Polys[string(reply.LTSID)] = &pubPoly{s.Suite().Point().Base(), dks.Commits}
-		s.storage.Rosters[string(reply.LTSID)] = &cl.Roster
-		s.storage.OLIDs[string(reply.LTSID)] = cl.BCID
+		s.storage.Rosters[string(reply.LTSID)] = roster
+		s.storage.OLIDs[string(reply.LTSID)] = cl.ByzCoinID
 		s.storage.Unlock()
 		s.save()
 		reply.X = shared.X
@@ -105,6 +113,32 @@ func (s *Service) CreateLTS(cl *CreateLTS) (reply *CreateLTSReply, err error) {
 		return nil, errors.New("dkg didn't finish in time")
 	}
 	return
+}
+
+func (s *Service) getLtsRoster(scID skipchain.SkipBlockID, roster *onet.Roster, instanceID byzcoin.InstanceID) (*onet.Roster, error) {
+	c := byzcoin.NewClient(scID, *roster)
+	resp, err := c.GetProof(instanceID.Slice())
+	if err != nil {
+		return nil, err
+	}
+	if ok, err := resp.Proof.InclusionProof.Exists(instanceID.Slice()); err != nil {
+		return nil, err
+		if !ok {
+			return nil, errors.New("key does not exist")
+		}
+	}
+
+	buf, cID, _, err := resp.Proof.Get(instanceID.Slice())
+	if cID != ContractLongTermSecretID {
+		return nil, errors.New("invalid contract ID: " + cID)
+	}
+
+	var ltsRoster onet.Roster
+	err = protobuf.DecodeWithConstructors(buf, &ltsRoster, network.DefaultConstructors(cothority.Suite))
+	if err != nil {
+		return nil, err
+	}
+	return &ltsRoster, nil
 }
 
 // DecryptKey takes as an input a Read- and a Write-proof. Proofs contain
@@ -234,6 +268,7 @@ func (s *Service) NewProtocol(tn *onet.TreeNodeInstance, conf *onet.GenericConfi
 			s.storage.Unlock()
 			s.save()
 		}(conf)
+		// TODO make the roster verification here?
 		return pi, nil
 	case protocol.NameOCS:
 		s.storage.Lock()
@@ -301,6 +336,7 @@ func newService(c *onet.Context) (onet.Service, error) {
 	}
 	byzcoin.RegisterContract(c, ContractWriteID, s.ContractWrite)
 	byzcoin.RegisterContract(c, ContractReadID, s.ContractRead)
+	byzcoin.RegisterContract(c, ContractLongTermSecretID, s.ContractLongTermSecret)
 	if err := s.tryLoad(); err != nil {
 		log.Error(err)
 		return nil, err

@@ -59,10 +59,12 @@ type Read struct {
 
 // CreateLTS is used to start a DKG and store the private keys in each node.
 type CreateLTS struct {
-	// Roster is the list of nodes that should participate in the DKG.
-	Roster onet.Roster
-	// BCID is the ID of the ByzCoin ledger that can use this LTS.
-	BCID skipchain.SkipBlockID
+	// ByzCoinRoster is the roster of ByzCoin that holds the instance ID.
+	ByzCoinRoster onet.Roster
+	// ByzCoinID is the ID of the ByzCoin ledger that can use this LTS.
+	ByzCoinID skipchain.SkipBlockID
+	// InstanceID is the instance ID where the LTS roster is stored.
+	InstanceID byzcoin.InstanceID
 }
 
 // CreateLTSReply is returned upon successfully setting up the distributed

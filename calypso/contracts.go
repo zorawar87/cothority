@@ -6,6 +6,7 @@ import (
 	"github.com/dedis/cothority"
 	"github.com/dedis/cothority/byzcoin"
 	"github.com/dedis/cothority/darc"
+	"github.com/dedis/onet"
 	"github.com/dedis/onet/log"
 	"github.com/dedis/onet/network"
 	"github.com/dedis/protobuf"
@@ -120,4 +121,43 @@ func (s *Service) ContractRead(cdb byzcoin.ReadOnlyStateTrie, inst byzcoin.Instr
 		return nil, nil, errors.New("not a spawn instruction")
 	}
 
+}
+
+// ContractLongTermSecretID is the contract ID for updating the LTS roster.
+var ContractLongTermSecretID = "longTermSecret"
+
+// ContractLongTermSecret is used to create and update the LTS roster.
+func (s *Service) ContractLongTermSecret(cdb byzcoin.ReadOnlyStateTrie, inst byzcoin.Instruction, ctxHash []byte, c []byzcoin.Coin) ([]byzcoin.StateChange, []byzcoin.Coin, error) {
+	err := inst.Verify(cdb, ctxHash)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var darcID darc.ID
+	_, _, darcID, err = cdb.GetValues(inst.InstanceID.Slice())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	switch inst.GetType() {
+	case byzcoin.SpawnType, byzcoin.InvokeType:
+		if inst.Spawn.ContractID != ContractLongTermSecretID {
+			return nil, nil, errors.New("can only spawn long-term-secret instances")
+		}
+		r := inst.Spawn.Args.Search("roster")
+		if r == nil || len(r) == 0 {
+			return nil, nil, errors.New("need a roster argument")
+		}
+		var roster onet.Roster
+		err := protobuf.DecodeWithConstructors(r, &roster, network.DefaultConstructors(cothority.Suite))
+		if err != nil {
+			return nil, nil, errors.New("passed roster argument is invalid: " + err.Error())
+		}
+		if inst.GetType() == byzcoin.SpawnType {
+			return byzcoin.StateChanges{byzcoin.NewStateChange(byzcoin.Create, inst.DeriveID(""), ContractLongTermSecretID, r, darcID)}, c, nil
+		}
+		return byzcoin.StateChanges{byzcoin.NewStateChange(byzcoin.Update, inst.DeriveID(""), ContractLongTermSecretID, r, darcID)}, c, nil
+	default:
+		return nil, nil, errors.New("invalid instruction type")
+	}
 }

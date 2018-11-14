@@ -207,9 +207,35 @@ func newTS(t *testing.T, nodes int) ts {
 	s.signer = darc.NewSignerEd25519(nil, nil)
 	s.createGenesis(t)
 
+	// Create LTS instance
+	rosterBuf, err := protobuf.Encode(s.roster)
+	require.NoError(t, err)
+	inst := byzcoin.Instruction{
+		InstanceID: byzcoin.NewInstanceID(s.gDarc.GetBaseID()),
+		Spawn: &byzcoin.Spawn{
+			ContractID: ContractLongTermSecretID,
+			Args: []byzcoin.Argument{
+				{
+					Name:  "roster",
+					Value: rosterBuf,
+				},
+			},
+		},
+		SignerCounter: []uint64{1},
+	}
+	tx := byzcoin.ClientTransaction{
+		Instructions: []byzcoin.Instruction{inst},
+	}
+	require.NoError(t, tx.SignWith(s.signer))
+	_, err = s.cl.AddTransactionAndWait(tx, 4)
+	require.NoError(t, err)
+
 	// Start DKG
-	var err error
-	s.ltsReply, err = s.services[0].CreateLTS(&CreateLTS{Roster: *s.roster, BCID: s.gbReply.Skipblock.Hash})
+	s.ltsReply, err = s.services[0].CreateLTS(&CreateLTS{
+		ByzCoinRoster: *s.roster,
+		ByzCoinID:     s.gbReply.Skipblock.Hash,
+		InstanceID:    tx.Instructions[0].DeriveID(""),
+	})
 	require.Nil(t, err)
 
 	return s
@@ -218,7 +244,10 @@ func newTS(t *testing.T, nodes int) ts {
 func (s *ts) createGenesis(t *testing.T) {
 	var err error
 	s.genesisMsg, err = byzcoin.DefaultGenesisMsg(byzcoin.CurrentVersion, s.roster,
-		[]string{"spawn:" + ContractWriteID, "spawn:" + ContractReadID}, s.signer.Identity())
+		[]string{"spawn:" + ContractWriteID,
+			"spawn:" + ContractReadID,
+			"spawn:" + ContractLongTermSecretID},
+		s.signer.Identity())
 	require.Nil(t, err)
 	s.gDarc = &s.genesisMsg.GenesisDarc
 	s.genesisMsg.BlockInterval = time.Second

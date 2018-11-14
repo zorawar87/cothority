@@ -7,7 +7,6 @@ import (
 	"github.com/dedis/cothority"
 	"github.com/dedis/cothority/byzcoin"
 	"github.com/dedis/cothority/darc"
-	"github.com/dedis/cothority/darc/expression"
 	"github.com/dedis/onet"
 	"github.com/stretchr/testify/require"
 )
@@ -21,25 +20,27 @@ func TestClient_CreateLTS(t *testing.T) {
 
 	// Initialise the genesis message and send it to the service.
 	signer := darc.NewSignerEd25519(nil, nil)
-	msg, err := byzcoin.DefaultGenesisMsg(byzcoin.CurrentVersion, roster, []string{"spawn:dummy"}, signer.Identity())
+	msg, err := byzcoin.DefaultGenesisMsg(byzcoin.CurrentVersion, roster,
+		[]string{"spawn:dummy", "spawn:" + ContractLongTermSecretID},
+		signer.Identity())
 	msg.BlockInterval = 100 * time.Millisecond
 	require.Nil(t, err)
-
-	// The darc inside it should be valid.
 	d := msg.GenesisDarc
 	require.Nil(t, d.Verify(true))
-	//Create Ledger
+
+	// Create the clients
 	c, _, err := byzcoin.NewLedger(msg, false)
 	require.Nil(t, err)
-	//Create a Calypso Client (Byzcoin + Onet)
 	calypsoClient := NewClient(c)
-	//Invoke CreateLTS
-	ltsReply, err := calypsoClient.CreateLTS()
+
+	// Invoke CreateLTS
+	ltsReply, err := calypsoClient.CreateLTS(roster, d.GetBaseID(), []darc.Signer{signer}, []uint64{1})
 	require.Nil(t, err)
 	require.NotNil(t, ltsReply.LTSID)
 	require.NotNil(t, ltsReply.X)
 }
 
+/*
 // Tests the client api's AddRead, AddWrite, DecryptKey
 func TestClient_Calypso(t *testing.T) {
 	l := onet.NewTCPTest(cothority.Suite)
@@ -149,3 +150,4 @@ func TestClient_Calypso(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, key1, keyCopy1)
 }
+*/
