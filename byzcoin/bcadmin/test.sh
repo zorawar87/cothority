@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 DBG_TEST=2
-DBG_SRV=0
+DBG_SRV=2
 DBG_BA=2
 
-NBR_SERVERS=3
+NBR_SERVERS=4
 NBR_SERVERS_GROUP=3
 
 . "$(go env GOPATH)/src/github.com/dedis/cothority/libtest.sh"
@@ -13,7 +13,9 @@ main(){
   startTest
   buildConode github.com/dedis/cothority/byzcoin
   rm -rf config
-  run testCreateStoreRead
+  run testRoster
+  # run testShow
+  # run testCreateStoreRead
   # run testAddDarc
   # run testRuleDarc
   # run testAddDarcFromOtherOne
@@ -22,9 +24,48 @@ main(){
   stopTest
 }
 
-testCreateStoreRead(){
+testRoster(){
+  rm -f config/*
+  runCoBG 1 2 3 4
+  bc=config/bc*cfg
+  key=config/key*cfg
+  testOK runBA create public.toml --interval .5s
+  testOK runBA show $bc
+  testFail runBA roster add $bc $key co1/public.toml
+  testOK runBA roster add $bc $key co4/public.toml
+
+  # Change the block size to create a new block before verifying the roster
+  testOK runBA config --blockSize 1000000 $bc $key
+  testGrep 2008 runBA show $bc
+
+  testFail runBA roster add $bc $key co4/public.toml
+  testFail runBA roster del $bc $key co1/public.toml
+  testOK runBA roster del $bc $key co2/public.toml
+  # Change the block size to create a new block before verifying the roster
+  testOK runBA config --blockSize 1000000 $bc $key
+  testNGrep 2004 runBA show $bc
+
+  testFail runBA roster del $bc $key co3/public.toml
+
+  testFail runBA roster leader $bc $key co2/public.toml
+  testFail runBA roster leader $bc $key co1/public.toml
+  testOK runBA roster leader $bc $key co3/public.toml
+  # Change the block size to create a new block before verifying the roster
+  testOK runBA config --blockSize 1000000 $bc $key
+  testGrep "Roster: tls://localhost:2006" runBA show $bc
+}
+
+testShow(){
+  rm -f config/*
   runCoBG 1 2 3
-  runGrepSed "export BC=" "" runBA create --roster public.toml --interval .5s
+  testOK runBA create public.toml --interval .5s
+  testOK runBA show config/bc*cfg
+}
+
+testCreateStoreRead(){
+  rm -f config/*
+  runCoBG 1 2 3
+  runGrepSed "export BC=" "" runBA create public.toml --interval .5s
   eval $SED
   [ -z "$BC" ] && exit 1
   testOK runBA add spawn:xxx -identity ed25519:foo
@@ -40,7 +81,7 @@ testCreateStoreRead(){
 
 testAddDarc(){
   runCoBG 1 2 3
-  runGrepSed "export BC=" "" ./"$APP" create --roster public.toml --interval .5s
+  runGrepSed "export BC=" "" ./"$APP" create public.toml --interval .5s
   eval $SED
   [ -z "$BC" ] && exit 1
 
@@ -53,7 +94,7 @@ testAddDarc(){
 
 testRuleDarc(){
   runCoBG 1 2 3
-  runGrepSed "export BC=" "" ./"$APP" create --roster public.toml --interval .5s
+  runGrepSed "export BC=" "" ./"$APP" create public.toml --interval .5s
   eval $SED
   [ -z "$BC" ] && exit 1
 
@@ -70,7 +111,7 @@ testRuleDarc(){
 
 testAddDarcFromOtherOne(){
   runCoBG 1 2 3
-  runGrepSed "export BC=" "" ./"$APP" create --roster public.toml --interval .5s
+  runGrepSed "export BC=" "" ./"$APP" create public.toml --interval .5s
   eval $SED
   [ -z "$BC" ] && exit 1
 
@@ -83,7 +124,7 @@ testAddDarcFromOtherOne(){
 
 testAddDarcWithOwner(){
   runCoBG 1 2 3
-  runGrepSed "export BC=" "" ./"$APP" create --roster public.toml --interval .5s
+  runGrepSed "export BC=" "" ./"$APP" create public.toml --interval .5s
   eval $SED
   [ -z "$BC" ] && exit 1
 
@@ -96,7 +137,7 @@ testAddDarcWithOwner(){
 
 testExpression(){
   runCoBG 1 2 3
-  runGrepSed "export BC=" "" ./"$APP" create --roster public.toml --interval .5s
+  runGrepSed "export BC=" "" ./"$APP" create public.toml --interval .5s
   eval $SED
   [ -z "$BC" ] && exit 1
 
