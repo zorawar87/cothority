@@ -29,8 +29,12 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "group, g",
-			Value: "group.toml",
+			Value: "public.toml",
 			Usage: "Cothority group definition in `FILE.toml`",
+		},
+		cli.StringFlag{
+			Name:  "host",
+			Usage: "Request information about this host",
 		},
 		cli.StringFlag{
 			Name:  "format, f",
@@ -62,14 +66,29 @@ type se struct {
 func action(c *cli.Context) error {
 	groupToml := c.GlobalString("g")
 	format := c.String("format")
+	var list []*network.ServerIdentity
 
-	el, err := readGroup(groupToml)
-	log.ErrFatal(err, "Couldn't Read File")
-	log.Lvl3(el)
+	host := c.String("host")
+	if host != "" {
+		// Only contact one host
+		log.Print("Only contacting one host", host)
+		addr := network.Address(host)
+		if !strings.HasPrefix(host, "tls://") {
+			addr = network.NewAddress(network.TLS, host)
+		}
+		list = append(list, network.NewServerIdentity(nil, addr))
+	} else {
+
+		ro, err := readGroup(groupToml)
+		log.ErrFatal(err, "Couldn't Read File")
+		log.Lvl3(ro)
+		list = ro.List
+		log.Print("List is", list)
+	}
 	cl := status.NewClient()
 
 	var all []se
-	for _, server := range el.List {
+	for _, server := range list {
 		sr, err := cl.Request(server)
 		if err != nil {
 			err = fmt.Errorf("could not get status from %v: %v", server, err)

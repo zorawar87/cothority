@@ -143,6 +143,9 @@ func (c *Client) GetGenDarc() (*darc.Darc, error) {
 
 	// Sanity check the values.
 	_, _, contract, darcID, err := p.Proof.KeyValue()
+	if err != nil {
+		return nil, errors.New("couldn't get keyvalue: " + err.Error())
+	}
 	if contract != ContractConfigID {
 		return nil, errors.New("expected contract to be config but got: " + contract)
 	}

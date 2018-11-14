@@ -180,6 +180,7 @@ func init() {
 		lib.ConfigPath = c.String("config")
 		return nil
 	}
+	cliApp.ErrWriter = cliApp.Writer
 }
 
 func main() {
@@ -259,13 +260,12 @@ func show(c *cli.Context) error {
 	fmt.Fprintln(c.App.Writer, "Roster:", strings.Join(roster, ", "))
 
 	gd, err := cl.GetGenDarc()
-	if err == nil {
-		fmt.Fprintln(c.App.Writer, gd)
-	} else {
-		fmt.Fprintln(c.App.ErrWriter, "could not fetch darc:", err)
+	if err != nil {
+		return err
 	}
+	fmt.Fprintln(c.App.Writer, gd)
 
-	return err
+	return nil
 }
 
 func add(c *cli.Context) error {

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-DBG_TEST=1
+DBG_TEST=2
 DBG_SRV=0
+DBG_BA=2
 
 NBR_SERVERS=3
 NBR_SERVERS_GROUP=3
@@ -9,31 +10,32 @@ NBR_SERVERS_GROUP=3
 . "$(go env GOPATH)/src/github.com/dedis/cothority/libtest.sh"
 
 main(){
-    startTest
-    buildConode github.com/dedis/cothority/byzcoin
-    run testCreateStoreRead
-    run testAddDarc
-    run testRuleDarc
-    run testAddDarcFromOtherOne
-    run testAddDarcWithOwner
-    run testExpression
-    stopTest
+  startTest
+  buildConode github.com/dedis/cothority/byzcoin
+  rm -rf config
+  run testCreateStoreRead
+  # run testAddDarc
+  # run testRuleDarc
+  # run testAddDarcFromOtherOne
+  # run testAddDarcWithOwner
+  # run testExpression
+  stopTest
 }
 
 testCreateStoreRead(){
-	runCoBG 1 2 3
-    runGrepSed "export BC=" "" ./bcadmin create --roster public.toml --interval .5s
-	eval $SED
-	[ -z "$BC" ] && exit 1
-    testOK ./bcadmin add spawn:xxx -identity ed25519:foo
-	testGrep "spawn:xxx - \"ed25519:foo\"" ./bcadmin show
-	# Should not allow overwrite on rule without replace.
-    testFail ./bcadmin add spawn:xxx -identity "& ed25519:foo ed25519:bar"
-    testOK ./bcadmin add spawn:xxx -replace -identity "& ed25519:foo ed25519:bar"
-	testGrep "spawn:xxx - \"& ed25519:foo ed25519:bar\"" ./bcadmin show
-	# Do not allow both, neither.
-    testFail ./bcadmin add spawn:xxx -identity id -expression exp
-    testFail ./bcadmin add spawn:xxx
+  runCoBG 1 2 3
+  runGrepSed "export BC=" "" runBA create --roster public.toml --interval .5s
+  eval $SED
+  [ -z "$BC" ] && exit 1
+  testOK runBA add spawn:xxx -identity ed25519:foo
+  testGrep "spawn:xxx - \"ed25519:foo\"" runBA show
+  # Should not allow overwrite on rule without replace.
+  testFail runBA add spawn:xxx -identity "& ed25519:foo ed25519:bar"
+  testOK runBA add spawn:xxx -replace -identity "& ed25519:foo ed25519:bar"
+  testGrep "spawn:xxx - \"& ed25519:foo ed25519:bar\"" runBA show
+  # Do not allow both, neither.
+  testFail runBA add spawn:xxx -identity id -expression exp
+  testFail runBA add spawn:xxx
 }
 
 testAddDarc(){
@@ -112,6 +114,10 @@ testExpression(){
   testOK ./"$APP" darc rule -replace -rule spawn:darc -identity "$KEY & $KEY2" -darc "$ID" -sign "$KEY"
   testFail ./"$APP" darc add -darc "$ID" -sign "$KEY"
   testFail ./"$APP" darc add -darc "$ID" -sign "$KEY2"
+}
+
+runBA(){
+  ./bcadmin -c config/ --debug $DBG_BA "$@"
 }
 
 main

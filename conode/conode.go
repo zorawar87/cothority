@@ -73,7 +73,7 @@ func main() {
 				cli.IntFlag{
 					Name:  "port",
 					Usage: "which port to listen on",
-					Value: 6879,
+					Value: 7770,
 				},
 				cli.StringFlag{
 					Name:  "description",
