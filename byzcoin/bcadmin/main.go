@@ -1,16 +1,21 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/dedis/cothority"
 	"github.com/dedis/cothority/byzcoin"
 	"github.com/dedis/cothority/byzcoin/bcadmin/lib"
+	"github.com/dedis/cothority/byzcoin/contracts"
 	"github.com/dedis/cothority/darc"
 	"github.com/dedis/cothority/darc/expression"
 	"github.com/dedis/kyber/util/random"
@@ -44,6 +49,12 @@ var cmds = cli.Commands{
 		Action: create,
 	},
 	{
+		Name:      "mint",
+		Usage:     "mint coins on account",
+		ArgsUsage: "bc-xxx.cfg key-xxx.cfg public-key",
+		Action:    mint,
+	},
+	{
 		Name:    "roster",
 		Usage:   "change the roster of the ByzCoin",
 		Aliases: []string{"r"},
@@ -62,7 +73,7 @@ var cmds = cli.Commands{
 			},
 			{
 				Name:      "leader",
-				ArgsUsage: "bc-xxx.cfg private.toml",
+				ArgsUsage: "bc-xxx.cfg key-xxx.cfg public.toml",
 				Usage:     "Set a specific node to be the leader",
 				Action:    rosterLeader,
 			},
@@ -598,6 +609,130 @@ func config(c *cli.Context) error {
 
 	log.Lvl1("Updated configuration")
 
+	return nil
+}
+
+func mint(c *cli.Context) error {
+	if c.NArg() < 4 {
+		return errors.New("Please give the following arguments: bc-xxx.cfg key-xxx.cfg pubkey coins")
+	}
+	cfg, cl, signer, _, _, err := getBcKey(c)
+	if err != nil {
+		return err
+	}
+
+	pubBuf, err := hex.DecodeString(c.Args().Get(2))
+	if err != nil {
+		return err
+	}
+
+	h := sha256.New()
+	h.Write([]byte(contracts.ContractCoinID))
+	h.Write(pubBuf)
+	account := byzcoin.NewInstanceID(h.Sum(nil))
+
+	coins, err := strconv.ParseUint(c.Args().Get(3), 10, 64)
+	if err != nil {
+		return err
+	}
+	coinsBuf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(coinsBuf, coins)
+
+	pub := cothority.Suite.Point()
+	err = pub.UnmarshalBinary(pubBuf)
+	if err != nil {
+		return err
+	}
+	pubI := darc.NewIdentityEd25519(pub)
+	rules := darc.NewRules()
+	rules.AddRule(darc.Action("spawn:coin"), expression.Expr(signer.Identity().String()))
+	rules.AddRule(darc.Action("invoke:transfer"), expression.Expr(pubI.String()))
+	rules.AddRule(darc.Action("invoke:mint"), expression.Expr(signer.Identity().String()))
+	d := darc.NewDarc(rules, []byte("new coin for mba"))
+	dBuf, err := d.ToProto()
+	if err != nil {
+		return err
+	}
+
+	cReply, err := cl.GetSignerCounters(signer.Identity().String())
+	if err != nil {
+		return err
+	}
+	counters := cReply.Counters
+	counters[0]++
+
+	log.Info("Creating darc for coin")
+	ctx := byzcoin.ClientTransaction{
+		Instructions: byzcoin.Instructions{{
+			InstanceID: byzcoin.NewInstanceID(cfg.GenesisDarc.GetBaseID()),
+			Spawn: &byzcoin.Spawn{
+				ContractID: byzcoin.ContractDarcID,
+				Args: byzcoin.Arguments{{
+					Name:  "darc",
+					Value: dBuf,
+				}},
+			},
+			SignerCounter: counters,
+		}},
+	}
+	ctx.SignWith(*signer)
+	ctx.InstructionsHash = ctx.Instructions.Hash()
+	_, err = cl.AddTransactionAndWait(ctx, 10)
+	if err != nil {
+		return err
+	}
+
+	log.Info("Spawning coin")
+	counters[0]++
+	ctx = byzcoin.ClientTransaction{
+		Instructions: byzcoin.Instructions{{
+			InstanceID: byzcoin.NewInstanceID(d.GetBaseID()),
+			Spawn: &byzcoin.Spawn{
+				ContractID: contracts.ContractCoinID,
+				Args: byzcoin.Arguments{
+					{
+						Name:  "type",
+						Value: contracts.CoinName.Slice(),
+					},
+					{
+						Name:  "public",
+						Value: pubBuf,
+					},
+				},
+			},
+			SignerCounter: counters,
+		}},
+	}
+	ctx.SignWith(*signer)
+	ctx.InstructionsHash = ctx.Instructions.Hash()
+	_, err = cl.AddTransactionAndWait(ctx, 10)
+	if err != nil {
+		return err
+	}
+
+	log.Info("Minting coin")
+	counters[0]++
+	ctx = byzcoin.ClientTransaction{
+		Instructions: byzcoin.Instructions{{
+			InstanceID: account,
+			Invoke: &byzcoin.Invoke{
+				Command: "mint",
+				Args: byzcoin.Arguments{{
+					Name:  "coins",
+					Value: coinsBuf,
+				}},
+			},
+			SignerCounter: counters,
+		}},
+	}
+	ctx.SignWith(*signer)
+	ctx.InstructionsHash = ctx.Instructions.Hash()
+	_, err = cl.AddTransactionAndWait(ctx, 10)
+	if err != nil {
+		return err
+	}
+
+	log.Info("Account created and filled with coins")
 	return nil
 }
 

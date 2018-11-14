@@ -13,7 +13,8 @@ main(){
   startTest
   buildConode github.com/dedis/cothority/byzcoin
   rm -rf config
-  run testRoster
+  run testCoin
+  # run testRoster
   # run testShow
   # run testCreateStoreRead
   # run testAddDarc
@@ -24,12 +25,21 @@ main(){
   stopTest
 }
 
+testCoin(){
+  rm -f config/*
+  runCoBG 1 2 3
+  testOK runBA create public.toml --interval .5s
+  bc=config/bc*cfg
+  key=config/key*cfg
+  testOK runBA coin create
+}
+
 testRoster(){
   rm -f config/*
   runCoBG 1 2 3 4
+  testOK runBA create public.toml --interval .5s
   bc=config/bc*cfg
   key=config/key*cfg
-  testOK runBA create public.toml --interval .5s
   testOK runBA show $bc
   testFail runBA roster add $bc $key co1/public.toml
   testOK runBA roster add $bc $key co4/public.toml

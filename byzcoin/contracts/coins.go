@@ -70,6 +70,12 @@ func ContractCoin(cdb byzcoin.ReadOnlyStateTrie, inst byzcoin.Instruction, ctxHa
 		} else {
 			ci.Name = CoinName
 		}
+		if t := inst.Spawn.Args.Search("public"); t != nil {
+			h := sha256.New()
+			h.Write([]byte(ContractCoinID))
+			h.Write(t)
+			ca = byzcoin.NewInstanceID(h.Sum(nil))
+		}
 		var ciBuf []byte
 		ciBuf, err = protobuf.Encode(&ci)
 		if err != nil {
