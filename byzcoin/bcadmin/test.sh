@@ -11,10 +11,10 @@ NBR_SERVERS_GROUP=3
 
 main(){
   startTest
-  buildConode github.com/dedis/cothority/byzcoin
+  buildConode github.com/dedis/cothority/byzcoin github.com/dedis/cothority/byzcoin/contracts
   rm -rf config
   run testCoin
-  # run testRoster
+  run testRoster
   # run testShow
   # run testCreateStoreRead
   # run testAddDarc
@@ -31,7 +31,7 @@ testCoin(){
   testOK runBA create public.toml --interval .5s
   bc=config/bc*cfg
   key=config/key*cfg
-  testOK runBA coin create
+  testOK runBA mint $bc $key 0000000000000000000000000000000000000000000000000000000000000000 10000
 }
 
 testRoster(){

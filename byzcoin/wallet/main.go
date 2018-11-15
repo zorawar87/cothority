@@ -52,6 +52,12 @@ var cmds = cli.Commands{
 		Usage:     "transfer coins from your account to another one",
 		ArgsUsage: "coins account",
 		Action:    transfer,
+		Flags: []cli.Flag{
+			cli.IntFlag{
+				Name:  "multi",
+				Usage: "to send multiple transactions and measure tps",
+				Value: 1,
+			}},
 	},
 }
 
@@ -196,37 +202,44 @@ func transfer(c *cli.Context) error {
 
 	signer := darc.NewSignerEd25519(cfg.KeyPair.Public, cfg.KeyPair.Private)
 	counters, err := cl.GetSignerCounters(signer.Identity().String())
-	counters.Counters[0]++
-	amountBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(amountBuf, amount)
-	ctx := byzcoin.ClientTransaction{
-		Instructions: byzcoin.Instructions{
-			{
-				InstanceID: iid,
-				Invoke: &byzcoin.Invoke{
-					Command: "transfer",
-					Args: byzcoin.Arguments{
-						{
-							Name:  "coins",
-							Value: amountBuf,
-						},
-						{
-							Name:  "destination",
-							Value: target,
+	multi := c.Int("multi")
+	for tx := 0; tx < multi; tx++ {
+		counters.Counters[0]++
+		amountBuf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(amountBuf, amount)
+		ctx := byzcoin.ClientTransaction{
+			Instructions: byzcoin.Instructions{
+				{
+					InstanceID: iid,
+					Invoke: &byzcoin.Invoke{
+						Command: "transfer",
+						Args: byzcoin.Arguments{
+							{
+								Name:  "coins",
+								Value: amountBuf,
+							},
+							{
+								Name:  "destination",
+								Value: target,
+							},
 						},
 					},
+					SignerCounter: counters.Counters,
 				},
-				SignerCounter: counters.Counters,
 			},
-		},
-	}
-	ctx.SignWith(signer)
-	ctx.InstructionsHash = ctx.Instructions.Hash()
+		}
+		ctx.SignWith(signer)
+		ctx.InstructionsHash = ctx.Instructions.Hash()
 
-	log.Info("Sending transaction of", amount, "coins to address", c.Args().Get(1))
-	_, err = cl.AddTransactionAndWait(ctx, 10)
-	if err != nil {
-		return err
+		log.Info("Sending transaction of", amount, "coins to address", c.Args().Get(1))
+		wait := 0
+		if tx == multi-1 {
+			wait = 10
+		}
+		_, err = cl.AddTransactionAndWait(ctx, wait)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.Info("Transaction succeeded")

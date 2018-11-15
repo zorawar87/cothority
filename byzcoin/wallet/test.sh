@@ -15,9 +15,33 @@ main(){
   build $APPDIR/../bcadmin
   rm -rf config wallet{1,2}
   mkdir wallet{1,2}
+  run testMulti
   # run testLoadSave
-  run testCoin
+  # run testCoin
   stopTest
+}
+
+testMulti(){
+  rm -f config/*
+  runCoBG 1 2 3
+  testOK runBA create public.toml --interval .5s
+  bc=config/bc*cfg
+  key=config/key*cfg
+  testOK runWallet 1 join $bc
+  runGrepSed "Public key is:" "s/.* //" runWallet 1 show
+  PUB=$SED
+  runGrepSed "Coin-address is:" "s/.* //" runWallet 1 show
+  ACCOUNT=$SED
+  testOK runBA mint $bc $key $PUB 1000
+
+  testOK runWallet 2 join $bc
+  runGrepSed "Public key is:" "s/.* //" runWallet 2 show
+  PUB2=$SED
+  testOK runBA mint $bc $key $PUB2 1000
+
+  testOK runWallet 2 transfer --multi 10 1 $ACCOUNT
+  testGrep "Balance is: 990" runWallet 2 show
+  testGrep "Balance is: 1010" runWallet 1 show
 }
 
 testLoadSave(){

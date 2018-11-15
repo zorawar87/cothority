@@ -58,6 +58,13 @@ class ByzCoinRPC {
   }
 
   /**
+   * @return {Skipchain} the instance of the skipchain used in this ByzCoinRPC
+   */
+  get skipchain() {
+    return this._skipchain;
+  }
+
+  /**
    *
    * @return {Roster} roster - the roster that hosts the byzcoin
    */

@@ -1913,6 +1913,9 @@ func (s *Service) startAllChains() error {
 		if err != nil {
 			panic("getLeader should not return an error if roster is initialised.")
 		}
+
+		sb := s.db().GetByID(gen)
+		log.Print(s.ServerIdentity(), "has leader", leader, "in block", sb.Roster)
 		if leader.Equal(s.ServerIdentity()) {
 			s.pollChanMut.Lock()
 			s.pollChanWG.Add(1)

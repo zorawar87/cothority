@@ -587,6 +587,9 @@ func updateConfig(cl *byzcoin.Client, signer *darc.Signer, chainConfig byzcoin.C
 
 func config(c *cli.Context) error {
 	_, cl, signer, _, chainConfig, err := getBcKey(c)
+	if err != nil {
+		return err
+	}
 
 	if interval := c.String("interval"); interval != "" {
 		dur, err := time.ParseDuration(interval)
@@ -747,7 +750,7 @@ func rosterAdd(c *cli.Context) error {
 		return errors.New("new node is already in roster")
 	}
 	log.Lvl2("Old roster is:", old.List)
-	chainConfig.Roster = *onet.NewRoster(append(old.List, pub))
+	chainConfig.Roster = *old.Concat(pub)
 	log.Lvl2("New roster is:", chainConfig.Roster.List)
 
 	err = updateConfig(cl, signer, chainConfig)

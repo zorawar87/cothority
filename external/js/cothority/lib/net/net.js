@@ -127,7 +127,7 @@ class RosterSocket {
         const addr = addresses[i];
         try {
           const socket = new Socket(addr, service);
-          console.log("RosterSocket: trying out " + addr + "/" + service);
+          // console.log("RosterSocket: trying out " + addr + "/" + service);
           const socketResponse = yield socket.send(request, response, data);
           that.lastGoodServer = addr;
           return Promise.resolve(socketResponse);
