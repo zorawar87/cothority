@@ -134,13 +134,13 @@ func (s *Service) ContractLongTermSecret(cdb byzcoin.ReadOnlyStateTrie, inst byz
 	}
 
 	var darcID darc.ID
-	_, _, darcID, err = cdb.GetValues(inst.InstanceID.Slice())
+	_, _, _, darcID, err = cdb.GetValues(inst.InstanceID.Slice())
 	if err != nil {
 		return nil, nil, err
 	}
 
 	switch inst.GetType() {
-	case byzcoin.SpawnType, byzcoin.InvokeType:
+	case byzcoin.SpawnType:
 		if inst.Spawn.ContractID != ContractLongTermSecretID {
 			return nil, nil, errors.New("can only spawn long-term-secret instances")
 		}
@@ -153,8 +153,19 @@ func (s *Service) ContractLongTermSecret(cdb byzcoin.ReadOnlyStateTrie, inst byz
 		if err != nil {
 			return nil, nil, errors.New("passed roster argument is invalid: " + err.Error())
 		}
-		if inst.GetType() == byzcoin.SpawnType {
-			return byzcoin.StateChanges{byzcoin.NewStateChange(byzcoin.Create, inst.DeriveID(""), ContractLongTermSecretID, r, darcID)}, c, nil
+		return byzcoin.StateChanges{byzcoin.NewStateChange(byzcoin.Create, inst.DeriveID(""), ContractLongTermSecretID, r, darcID)}, c, nil
+	case byzcoin.InvokeType:
+		if inst.Invoke.Command != "reshare" {
+			return nil, nil, errors.New("can only reshare long-term secrets")
+		}
+		r := inst.Invoke.Args.Search("roster")
+		if r == nil || len(r) == 0 {
+			return nil, nil, errors.New("need a roster argument")
+		}
+		var roster onet.Roster
+		err := protobuf.DecodeWithConstructors(r, &roster, network.DefaultConstructors(cothority.Suite))
+		if err != nil {
+			return nil, nil, errors.New("passed roster argument is invalid: " + err.Error())
 		}
 		return byzcoin.StateChanges{byzcoin.NewStateChange(byzcoin.Update, inst.DeriveID(""), ContractLongTermSecretID, r, darcID)}, c, nil
 	default:

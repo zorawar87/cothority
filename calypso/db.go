@@ -6,6 +6,8 @@ import (
 
 	dkgprotocol "github.com/dedis/cothority/dkg/pedersen"
 	"github.com/dedis/cothority/skipchain"
+	dkg "github.com/dedis/kyber/share/dkg/pedersen"
+	"github.com/dedis/kyber/util/key"
 	"github.com/dedis/onet"
 	"github.com/dedis/onet/log"
 )
@@ -22,6 +24,9 @@ type storage1 struct {
 	Polys   map[string]*pubPoly
 	Rosters map[string]*onet.Roster
 	OLIDs   map[string]skipchain.SkipBlockID
+
+	LongtermPair map[string]*key.Pair
+	DKS          map[string]*dkg.DistKeyShare
 
 	sync.Mutex
 }
@@ -60,6 +65,12 @@ func (s *Service) tryLoad() error {
 		}
 		if len(s.storage.OLIDs) == 0 {
 			s.storage.OLIDs = make(map[string]skipchain.SkipBlockID)
+		}
+		if len(s.storage.LongtermPair) == 0 {
+			s.storage.LongtermPair = make(map[string]*key.Pair)
+		}
+		if len(s.storage.DKS) == 0 {
+			s.storage.DKS = make(map[string]*dkg.DistKeyShare)
 		}
 	}()
 

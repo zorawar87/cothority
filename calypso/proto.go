@@ -2,9 +2,7 @@ package calypso
 
 import (
 	"github.com/dedis/cothority/byzcoin"
-	"github.com/dedis/cothority/skipchain"
 	"github.com/dedis/kyber"
-	"github.com/dedis/onet"
 )
 
 // PROTOSTART
@@ -58,13 +56,10 @@ type Read struct {
 // ***
 
 // CreateLTS is used to start a DKG and store the private keys in each node.
+// Prior to using this request, the Calypso roster must be recorded on the
+// ByzCoin blockchain in the instance specified by InstanceID.
 type CreateLTS struct {
-	// ByzCoinRoster is the roster of ByzCoin that holds the instance ID.
-	ByzCoinRoster onet.Roster
-	// ByzCoinID is the ID of the ByzCoin ledger that can use this LTS.
-	ByzCoinID skipchain.SkipBlockID
-	// InstanceID is the instance ID where the LTS roster is stored.
-	InstanceID byzcoin.InstanceID
+	byzcoin.Proof
 }
 
 // CreateLTSReply is returned upon successfully setting up the distributed
@@ -76,6 +71,18 @@ type CreateLTSReply struct {
 	X kyber.Point
 	// TODO: can we remove the LTSID and only use the public key to identify
 	// an LTS?
+}
+
+// ReshareLTS is used to update the LTS shares. Prior to using this request,
+// the Calypso roster must be updated on the ByzCoin blockchain in the instance
+// specified by InstanceID.
+type ReshareLTS struct {
+	byzcoin.Proof
+}
+
+// ReshareLTSReply is returned upon successful resharing. The LTSID and the
+// public key X should remain the same.
+type ReshareLTSReply struct {
 }
 
 // DecryptKey is sent by a reader after he successfully stored a 'Read' request

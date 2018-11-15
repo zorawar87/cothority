@@ -41,7 +41,7 @@ func NewClient(byzcoin *byzcoin.Client) *Client {
 // created. It first sends a transaction to ByzCoin to spawn a LTS instance,
 // then it asks the Calypso cothority to start the DKG.
 func (c *Client) CreateLTS(ltsRoster *onet.Roster, darcID darc.ID, signers []darc.Signer, counters []uint64) (reply *CreateLTSReply, err error) {
-	// Make the transaction
+	// Make the transaction and get its proof
 	rosterBuf, err := protobuf.Encode(ltsRoster)
 	if err != nil {
 		return nil, err
@@ -68,13 +68,15 @@ func (c *Client) CreateLTS(ltsRoster *onet.Roster, darcID darc.ID, signers []dar
 	if _, err := c.bcClient.AddTransactionAndWait(tx, 4); err != nil {
 		return nil, err
 	}
+	resp, err := c.bcClient.GetProof(tx.Instructions[0].DeriveID("").Slice())
+	if err != nil {
+		return nil, err
+	}
 
 	// Start the DKG
 	reply = &CreateLTSReply{}
 	err = c.c.SendProtobuf(c.bcClient.Roster.List[0], &CreateLTS{
-		ByzCoinRoster: c.bcClient.Roster,
-		ByzCoinID:     c.bcClient.ID,
-		InstanceID:    tx.Instructions[0].DeriveID(""),
+		Proof: resp.Proof,
 	}, reply)
 	if err != nil {
 		return nil, err

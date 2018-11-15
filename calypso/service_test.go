@@ -36,6 +36,53 @@ func TestService_CreateLTS(t *testing.T) {
 	}
 }
 
+func TestService_ReshareLTS(t *testing.T) {
+	for _, nodes := range []int{4, 7} {
+		func(nodes int) {
+			if nodes > 5 && testing.Short() {
+				log.Info("skipping, dkg might take too long for", nodes)
+				return
+			}
+			s := newTS(t, nodes)
+			defer s.closeAll(t)
+			require.NotNil(t, s.ltsReply.LTSID)
+			require.NotNil(t, s.ltsReply.X)
+
+			// Create a new roster that has one fewer node that
+			// before
+			newRoster := onet.NewRoster(s.roster.List[1:])
+			rosterBuf, err := protobuf.Encode(newRoster)
+			require.NoError(t, err)
+
+			ctx := byzcoin.ClientTransaction{
+				Instructions: []byzcoin.Instruction{
+					{
+						InstanceID: byzcoin.NewInstanceID(s.ltsReply.LTSID),
+						Invoke: &byzcoin.Invoke{
+							Command: "reshare",
+							Args: []byzcoin.Argument{
+								{
+									Name:  "roster",
+									Value: rosterBuf,
+								},
+							},
+						},
+						SignerCounter: []uint64{2},
+					},
+				},
+			}
+			require.Nil(t, ctx.SignWith(s.signer))
+			_, err = s.cl.AddTransactionAndWait(ctx, 4)
+			require.NoError(t, err)
+
+			// Get the proof and start resharing
+			proof, err := s.cl.GetProof(s.ltsReply.LTSID)
+			require.NoError(t, err)
+			s.services[0].ReshareLTS(&ReshareLTS{proof.Proof})
+		}(nodes)
+	}
+}
+
 // TestContract_Write creates a write request and check that it gets stored.
 func TestContract_Write(t *testing.T) {
 	s := newTS(t, 5)
@@ -230,11 +277,13 @@ func newTS(t *testing.T, nodes int) ts {
 	_, err = s.cl.AddTransactionAndWait(tx, 4)
 	require.NoError(t, err)
 
+	// Get the proof
+	resp, err := s.cl.GetProof(tx.Instructions[0].DeriveID("").Slice())
+	require.NoError(t, err)
+
 	// Start DKG
 	s.ltsReply, err = s.services[0].CreateLTS(&CreateLTS{
-		ByzCoinRoster: *s.roster,
-		ByzCoinID:     s.gbReply.Skipblock.Hash,
-		InstanceID:    tx.Instructions[0].DeriveID(""),
+		Proof: resp.Proof,
 	})
 	require.Nil(t, err)
 
@@ -246,7 +295,8 @@ func (s *ts) createGenesis(t *testing.T) {
 	s.genesisMsg, err = byzcoin.DefaultGenesisMsg(byzcoin.CurrentVersion, s.roster,
 		[]string{"spawn:" + ContractWriteID,
 			"spawn:" + ContractReadID,
-			"spawn:" + ContractLongTermSecretID},
+			"spawn:" + ContractLongTermSecretID,
+			"invoke:" + "reshare"},
 		s.signer.Identity())
 	require.Nil(t, err)
 	s.gDarc = &s.genesisMsg.GenesisDarc
