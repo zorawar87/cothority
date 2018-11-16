@@ -135,6 +135,12 @@ func readGroup(tomlFileName string) (*onet.Roster, error) {
 
 // prints the status response that is returned from the server
 func printTxt(e *status.Response) {
+	log.Info("-----------------------------------------------")
+	log.Infof("Address: \"%s\"", e.ServerIdentity.Address)
+	log.Info("Suite: \"Ed25519\"")
+	log.Infof("Public: \"%s\"", e.ServerIdentity.Public)
+	log.Infof("Description: \"%s\"", e.ServerIdentity.Description)
+	log.Info("-----------------------------------------------")
 	var a []string
 	if e.Status == nil {
 		log.Error("no status from ", e.ServerIdentity)

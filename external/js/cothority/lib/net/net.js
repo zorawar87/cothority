@@ -35,7 +35,7 @@ function Socket(addr, service) {
   this.send = (request, response, data) => {
     return new Promise((resolve, reject) => {
       const path = this.url + "/" + request.replace(/.*\./, '');
-      console.log("net.Socket: new WebSocket(" + path + ")");
+      // console.log("net.Socket: new WebSocket(" + path + ")");
       const ws = new WS(path);
       ws.binaryType = "arraybuffer";
 

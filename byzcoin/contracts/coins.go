@@ -108,6 +108,13 @@ func ContractCoin(cdb byzcoin.ReadOnlyStateTrie, inst byzcoin.Instruction, ctxHa
 		case "transfer":
 			// transfer sends a given amount of coins to another account.
 			target := inst.Invoke.Args.Search("destination")
+			if target == nil {
+				return nil, nil, errors.New("missing destination address")
+			}
+			targetInst := byzcoin.NewInstanceID(target)
+			if inst.InstanceID.Equal(targetInst) {
+				return nil, nil, errors.New("cannot send to ourselves")
+			}
 			var (
 				v   []byte
 				cid string

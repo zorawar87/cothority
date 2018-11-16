@@ -46,11 +46,17 @@ var cmds = cli.Commands{
 		Usage:   "shows the account address and the balance",
 		Aliases: []string{"s"},
 		Action:  show,
+		Flags: []cli.Flag{
+			cli.BoolFlag{
+				Name:  "address",
+				Usage: "show coin address (InstanceID)",
+			},
+		},
 	},
 	{
 		Name:      "transfer",
 		Usage:     "transfer coins from your account to another one",
-		ArgsUsage: "coins account",
+		ArgsUsage: "public key of account",
 		Action:    transfer,
 		Flags: []cli.Flag{
 			cli.IntFlag{
@@ -101,6 +107,10 @@ func main() {
 }
 
 func join(c *cli.Context) error {
+	if _, _, err := LoadConfig(); err == nil {
+		return fmt.Errorf("configuration already exists - please delete %s first",
+			filepath.Join(ConfigPath, configName))
+	}
 	if c.NArg() < 1 {
 		return errors.New("please give bc-xxx.cfg")
 	}
@@ -151,7 +161,9 @@ func show(c *cli.Context) error {
 		balance = coin.Value
 	}
 	log.Info("Public key is:", cfg.KeyPair.Public)
-	log.Info("Coin-address is:", iid)
+	if c.Bool("address") {
+		log.Info("Coin-address is:", iid)
+	}
 	log.Info("Balance is:", balance)
 	return nil
 }
@@ -165,10 +177,11 @@ func transfer(c *cli.Context) error {
 		return err
 	}
 
-	target, err := hex.DecodeString(c.Args().Get(1))
+	targetPub, err := encoding.StringHexToPoint(cothority.Suite, c.Args().Get(1))
 	if err != nil {
 		return err
 	}
+	target, err := coinHash(targetPub)
 
 	cfg, cl, err := LoadConfig()
 	if err != nil {
@@ -203,6 +216,10 @@ func transfer(c *cli.Context) error {
 	signer := darc.NewSignerEd25519(cfg.KeyPair.Public, cfg.KeyPair.Private)
 	counters, err := cl.GetSignerCounters(signer.Identity().String())
 	multi := c.Int("multi")
+	if multi > 200 {
+		log.Warn("Only allowing 200 transactions at a time")
+		multi = 200
+	}
 	for tx := 0; tx < multi; tx++ {
 		counters.Counters[0]++
 		amountBuf := make([]byte, 8)
@@ -220,7 +237,7 @@ func transfer(c *cli.Context) error {
 							},
 							{
 								Name:  "destination",
-								Value: target,
+								Value: target.Slice(),
 							},
 						},
 					},
@@ -419,5 +436,6 @@ func (cfg Config) Save() error {
 
 	buf, err := json.MarshalIndent(cfgJSON, "", " ")
 
+	os.MkdirAll(ConfigPath, 0700)
 	return ioutil.WriteFile(filepath.Join(ConfigPath, configName), buf, 0600)
 }
