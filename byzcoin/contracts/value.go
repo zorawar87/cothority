@@ -20,14 +20,13 @@ var ContractValueID = "value"
 // It can spawn new value instances and will store the "value" argument in these
 // new instances. Existing value instances can be updated and deleted.
 
-type Value []byte
 type contractValue struct {
 	byzcoin.BasicContract
-	Value
+	value []byte
 }
 
 func contractValueFromBytes(in []byte) (byzcoin.Contract, error) {
-	return &contractValue{Value: in}, nil
+	return &contractValue{value: in}, nil
 }
 
 func (c *contractValue) Spawn(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Instruction, coins []byzcoin.Coin) (sc []byzcoin.StateChange, cout []byzcoin.Coin, err error) {

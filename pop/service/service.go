@@ -905,6 +905,7 @@ func (s *Service) PropagateDescription(msg network.Message) {
 	log.Lvl2("Stored proposed description on", s.ServerIdentity())
 }
 
+// SignatureSize is the size of signatures expected by this service.
 const SignatureSize = 64
 
 // signs FinalStatement with BFTCosi and Propagates signature to other nodes

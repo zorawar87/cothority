@@ -222,23 +222,31 @@ type BasicContract struct{}
 
 func notImpl(what string) error { return fmt.Errorf("this contract does not implement %v", what) }
 
-func (c BasicContract) VerifyInstruction(rst ReadOnlyStateTrie, inst Instruction, ctxHash []byte) error {
+// VerifyInstruction offers the default implementation of verifying an instruction. Types
+// which embed BasicContract may choose to override this implementation.
+func (b BasicContract) VerifyInstruction(rst ReadOnlyStateTrie, inst Instruction, ctxHash []byte) error {
 	if err := inst.Verify(rst, ctxHash); err != nil {
 		return err
 	}
 	return nil
 }
 
+// Spawn is not implmented in a BasicContract. Types which embed BasicContract
+// must override this method if they support spawning.
 func (b BasicContract) Spawn(ReadOnlyStateTrie, Instruction, []Coin) (sc []StateChange, c []Coin, err error) {
 	err = notImpl("Spawn")
 	return
 }
 
+// Invoke is not implmented in a BasicContract. Types which embed BasicContract
+// must override this method if they support invoking.
 func (b BasicContract) Invoke(ReadOnlyStateTrie, Instruction, []Coin) (sc []StateChange, c []Coin, err error) {
 	err = notImpl("Invoke")
 	return
 }
 
+// Delete is not implmented in a BasicContract. Types which embed BasicContract
+// must override this method if they support deleting.
 func (b BasicContract) Delete(ReadOnlyStateTrie, Instruction, []Coin) (sc []StateChange, c []Coin, err error) {
 	err = notImpl("Delete")
 	return
