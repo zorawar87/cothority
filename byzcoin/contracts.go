@@ -222,8 +222,8 @@ type BasicContract struct{}
 
 func notImpl(what string) error { return fmt.Errorf("this contract does not implement %v", what) }
 
-func (c BasicContract) VerifyInstruction(rst ReadOnlyStateTrie, inst Instruction, msg []byte) error {
-	if err := inst.Verify(rst, msg); err != nil {
+func (c BasicContract) VerifyInstruction(rst ReadOnlyStateTrie, inst Instruction, ctxHash []byte) error {
+	if err := inst.Verify(rst, ctxHash); err != nil {
 		return err
 	}
 	return nil

@@ -731,7 +731,7 @@ func TestService_StateChange(t *testing.T) {
 	defer s.local.CloseAll()
 
 	var latest int64
-	f := func(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error) {
+	f := func(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
 		_, _, cid, _, err := cdb.GetValues(inst.InstanceID.Slice())
 		if err != nil {
 			return nil, nil, err
@@ -821,10 +821,7 @@ func TestService_StateChange(t *testing.T) {
 	}
 
 	ct1 := ClientTransaction{Instructions: instrs}
-	ct1.InstructionsHash = ct1.Instructions.Hash()
-
 	ct2 := ClientTransaction{Instructions: instrs2}
-	ct2.InstructionsHash = ct2.Instructions.Hash()
 
 	_, txOut, scs := s.service().createStateChanges(cdb.MakeStagingStateTrie(), s.genesis.SkipChainID(), NewTxResults(ct1, ct2), noTimeout)
 	require.Equal(t, 2, len(txOut))
@@ -899,8 +896,7 @@ func TestService_DarcSpawn(t *testing.T) {
 			SignerCounter: []uint64{1},
 		}},
 	}
-	ctx.InstructionsHash = ctx.Instructions.Hash()
-	require.Nil(t, ctx.Instructions[0].SignWith(ctx.InstructionsHash, s.signer))
+	require.Nil(t, ctx.Instructions[0].SignWith(ctx.Instructions.Hash(), s.signer))
 
 	s.sendTx(t, ctx)
 	pr := s.waitProof(t, NewInstanceID(darc2.GetBaseID()))
@@ -1629,7 +1625,7 @@ func TestService_StateChangeCache(t *testing.T) {
 	// only call it once.
 	contractID := "stateShangeCacheTest"
 	var ctr int
-	contract := func(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error) {
+	contract := func(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
 		ctr++
 		return []StateChange{}, []Coin{}, nil
 	}
@@ -1701,7 +1697,7 @@ func TestService_StateChangeStorage(t *testing.T) {
 	iid := genID()
 	fakeID := genID().Slice()
 	contractID := "stateShangeCacheTest"
-	contract := func(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error) {
+	contract := func(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
 		// Check the version is correctly increased for multiple state changes
 		sc1 := StateChange{
 			InstanceID:  iid[:],
@@ -1792,7 +1788,7 @@ func TestService_StateChangeCatchUp(t *testing.T) {
 
 	n := 5
 	contractID := "stateShangeCacheTest"
-	contract := func(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error) {
+	contract := func(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
 		// Check the state trie is created from the known global state
 		_, ver, _, _, _ := cdb.GetValues(inst.Hash())
 		iid := inst.Hash()
@@ -1818,8 +1814,7 @@ func TestService_StateChangeCatchUp(t *testing.T) {
 			SignerCounter: []uint64{counter},
 		}
 		tx := ClientTransaction{Instructions: Instructions{instr}}
-		tx.InstructionsHash = tx.Instructions.Hash()
-		err := tx.Instructions[0].SignWith(tx.InstructionsHash, s.signer)
+		err := tx.Instructions[0].SignWith(tx.Instructions.Hash(), s.signer)
 		require.Nil(t, err)
 
 		_, err = s.service().AddTransaction(&AddTxRequest{
@@ -2089,7 +2084,7 @@ func newSerN(t *testing.T, step int, interval time.Duration, n int, viewchange b
 
 type contractAdaptor struct {
 	BasicContract
-	cb func(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error)
+	cb func(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error)
 }
 
 func (ca *contractAdaptor) Spawn(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
@@ -2105,26 +2100,21 @@ func (ca *contractAdaptor) Delete(cdb ReadOnlyStateTrie, inst Instruction, c []C
 }
 
 // adaptor turns an old-style contract callback into a new-style contract.
-func adaptor(cb func(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error)) func([]byte) (Contract, error) {
+func adaptor(cb func(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error)) func([]byte) (Contract, error) {
 	return func([]byte) (Contract, error) {
 		return &contractAdaptor{cb: cb}, nil
 	}
 }
 
-func invalidContractFunc(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error) {
+func invalidContractFunc(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
 	return nil, nil, errors.New("this invalid contract always returns an error")
 }
 
-func panicContractFunc(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error) {
+func panicContractFunc(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
 	panic("this contract panics")
 }
 
-func dummyContractFunc(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error) {
-	err := inst.Verify(cdb, ctxHash)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func dummyContractFunc(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
 	_, _, _, darcID, err := cdb.GetValues(inst.InstanceID.Slice())
 	if err != nil {
 		return nil, nil, err
@@ -2144,11 +2134,11 @@ func dummyContractFunc(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, 
 	}
 }
 
-func slowContractFunc(cdb ReadOnlyStateTrie, inst Instruction, ctxHash []byte, c []Coin) ([]StateChange, []Coin, error) {
+func slowContractFunc(cdb ReadOnlyStateTrie, inst Instruction, c []Coin) ([]StateChange, []Coin, error) {
 	// This has to sleep for less than testInterval / 2 or else it will
 	// block the system from processing txs. See #1359.
 	time.Sleep(testInterval / 5)
-	return dummyContractFunc(cdb, inst, ctxHash, c)
+	return dummyContractFunc(cdb, inst, c)
 }
 
 func registerDummy(servers []*onet.Server) {

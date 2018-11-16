@@ -228,7 +228,6 @@ func (s *Service) CreateGenesisBlock(req *CreateGenesisBlock) (
 			Spawn:      spawn,
 		}},
 	}
-	ctx.InstructionsHash = ctx.Instructions.Hash()
 
 	sb, err := s.createNewBlock(nil, &req.Roster, NewTxResults(ctx))
 	if err != nil {
@@ -1556,20 +1555,15 @@ func (s *Service) createStateChanges(sst *stagingStateTrie, scID skipchain.SkipB
 	var cin []Coin
 clientTransactions:
 	for _, tx := range txIn {
-		if !bytes.Equal(tx.ClientTransaction.InstructionsHash, tx.ClientTransaction.Instructions.Hash()) {
-			log.Error(s.ServerIdentity(), "invalid instruction hash")
-			tx.Accepted = false
-			txOut = append(txOut, tx)
-			continue clientTransactions
-		}
 		txsz := txSize(tx)
 
 		// Make a new trie for each instruction. If the instruction is
 		// sucessfully implemented and changes applied, then keep it
 		// (via cdbTemp = cdbI.c), otherwise dump it.
 		sstTempC := sstTemp.Clone()
+		h := tx.ClientTransaction.Instructions.Hash()
 		for _, instr := range tx.ClientTransaction.Instructions {
-			scs, cout, err := s.executeInstruction(sstTempC, cin, instr, tx.ClientTransaction.InstructionsHash)
+			scs, cout, err := s.executeInstruction(sstTempC, cin, instr, h)
 			if err != nil {
 				log.Errorf("%s Call to contract returned error: %s", s.ServerIdentity(), err)
 				tx.Accepted = false
@@ -1669,6 +1663,12 @@ func (s *Service) executeInstruction(st ReadOnlyStateTrie, cin []Coin, instr Ins
 	if err != nil {
 		return nil, nil, err
 	}
+
+	/*
+		if c.VerifyInstruction(st, instr, ctxHash) {
+		}
+	*/
+
 	switch instr.GetType() {
 	case SpawnType:
 		scs, cout, err = c.Spawn(st, instr, cin)
@@ -2091,8 +2091,9 @@ func (s *Service) buildStateChanges(sid skipchain.SkipBlockID, sst *stagingState
 		if tx.Accepted {
 			// Only accepted transactions must be used
 			// to create the state changes
+			h := tx.ClientTransaction.Instructions.Hash()
 			for _, instr := range tx.ClientTransaction.Instructions {
-				scs, cout, err := s.executeInstruction(sst, cin, instr, tx.ClientTransaction.InstructionsHash)
+				scs, cout, err := s.executeInstruction(sst, cin, instr, h)
 				cin = cout
 				if err != nil {
 					return nil, err

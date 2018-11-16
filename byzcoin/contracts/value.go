@@ -35,7 +35,7 @@ func (c *contractValue) Spawn(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Instru
 
 	// Find the darcID for this instance.
 	var darcID darc.ID
-	_, _, darcID, err = rst.GetValues(inst.InstanceID.Slice())
+	_, _, _, darcID, err = rst.GetValues(inst.InstanceID.Slice())
 	if err != nil {
 		return
 	}
@@ -53,7 +53,7 @@ func (c *contractValue) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Instr
 	// Find the darcID for this instance.
 	var darcID darc.ID
 
-	_, _, _, darcID, err = cdb.GetValues(inst.InstanceID.Slice())
+	_, _, _, darcID, err = rst.GetValues(inst.InstanceID.Slice())
 	if err != nil {
 		return
 	}
@@ -75,7 +75,7 @@ func (c *contractValue) Delete(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Instr
 
 	// Find the darcID for this instance.
 	var darcID darc.ID
-	_, _, darcID, err = rst.GetValues(inst.InstanceID.Slice())
+	_, _, _, darcID, err = rst.GetValues(inst.InstanceID.Slice())
 	if err != nil {
 		return
 	}

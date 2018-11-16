@@ -16,7 +16,7 @@ var ContractCoinID = "coin"
 
 // CoinName is a well-known InstanceID that identifies coins as belonging
 // to this contract.
-var CoinName = iid("olCoin")
+var CoinName = iid("byzCoin")
 
 // ContractCoin is a coin implementation that holds one instance per coin.
 // If you spawn a new ContractCoin, it will create an account with a value
@@ -51,7 +51,7 @@ func (c *contractCoin) Spawn(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Instruc
 	cout = coins
 
 	var darcID darc.ID
-	_, _, darcID, err = rst.GetValues(inst.InstanceID.Slice())
+	_, _, _, darcID, err = rst.GetValues(inst.InstanceID.Slice())
 	if err != nil {
 		return
 	}
@@ -114,7 +114,7 @@ func (c *contractCoin) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Instru
 			cid string
 			did darc.ID
 		)
-		v, cid, did, err = rst.GetValues(target)
+		v, _, cid, did, err = rst.GetValues(target)
 		if err == nil && cid != ContractCoinID {
 			err = errors.New("destination is not a coin contract")
 		}
