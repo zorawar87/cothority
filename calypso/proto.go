@@ -2,6 +2,7 @@ package calypso
 
 import (
 	"github.com/dedis/cothority/byzcoin"
+	"github.com/dedis/cothority/skipchain"
 	"github.com/dedis/kyber"
 )
 
@@ -9,7 +10,6 @@ import (
 // type :skipchain.SkipBlockID:bytes
 // package calypso;
 // import "byzcoin.proto";
-// import "onet.proto";
 //
 // option java_package = "ch.epfl.dedis.lib.proto";
 // option java_outer_classname = "Calypso";
@@ -59,25 +59,23 @@ type Read struct {
 // Prior to using this request, the Calypso roster must be recorded on the
 // ByzCoin blockchain in the instance specified by InstanceID.
 type CreateLTS struct {
-	byzcoin.Proof
+	Proof byzcoin.Proof
 }
 
 // CreateLTSReply is returned upon successfully setting up the distributed
 // key.
 type CreateLTSReply struct {
-	// LTSID is a random 32-byte slice that represents the LTS.
-	LTSID []byte
+	ByzCoinID  skipchain.SkipBlockID
+	InstanceID []byte
 	// X is the public key of the LTS.
 	X kyber.Point
-	// TODO: can we remove the LTSID and only use the public key to identify
-	// an LTS?
 }
 
 // ReshareLTS is used to update the LTS shares. Prior to using this request,
 // the Calypso roster must be updated on the ByzCoin blockchain in the instance
 // specified by InstanceID.
 type ReshareLTS struct {
-	byzcoin.Proof
+	Proof byzcoin.Proof
 }
 
 // ReshareLTSReply is returned upon successful resharing. The LTSID and the
@@ -105,14 +103,8 @@ type DecryptKeyReply struct {
 	X kyber.Point
 }
 
-// SharedPublic asks for the shared public key of the corresponding LTSID
-type SharedPublic struct {
+// GetLTSReply asks for the shared public key of the corresponding LTSID
+type GetLTSReply struct {
 	// LTSID is the id of the LTS instance created.
 	LTSID []byte
-}
-
-// SharedPublicReply sends back the shared public key.
-type SharedPublicReply struct {
-	// X is the distributed public key.
-	X kyber.Point
 }

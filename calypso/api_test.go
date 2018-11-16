@@ -35,7 +35,8 @@ func TestClient_CreateLTS(t *testing.T) {
 	// Invoke CreateLTS
 	ltsReply, err := calypsoClient.CreateLTS(roster, d.GetBaseID(), []darc.Signer{signer}, []uint64{1})
 	require.Nil(t, err)
-	require.NotNil(t, ltsReply.LTSID)
+	require.NotNil(t, ltsReply.ByzCoinID)
+	require.NotNil(t, ltsReply.InstanceID)
 	require.NotNil(t, ltsReply.X)
 }
 

@@ -10,7 +10,6 @@ import ch.epfl.dedis.lib.darc.DarcId;
 import ch.epfl.dedis.lib.darc.Signer;
 import ch.epfl.dedis.lib.exception.CothorityException;
 import ch.epfl.dedis.lib.exception.CothorityNotFoundException;
-import com.google.protobuf.InvalidProtocolBufferException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +24,7 @@ public class WriteInstance {
     public static String ContractId = "calypsoWrite";
     private Instance instance;
     private CalypsoRPC calypso;
-    private LTS lts;
+    private CreateLTSReply lts;
 
     private final static Logger logger = LoggerFactory.getLogger(WriteInstance.class);
 
@@ -64,7 +63,7 @@ public class WriteInstance {
      *
      * @return the LTS
      */
-    public LTS getLts() {
+    public CreateLTSReply getLts() {
         return lts;
     }
 

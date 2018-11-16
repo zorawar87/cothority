@@ -30,7 +30,8 @@ func TestService_CreateLTS(t *testing.T) {
 			}
 			s := newTS(t, nodes)
 			defer s.closeAll(t)
-			require.NotNil(t, s.ltsReply.LTSID)
+			require.NotNil(t, s.ltsReply.ByzCoinID)
+			require.NotNil(t, s.ltsReply.InstanceID)
 			require.NotNil(t, s.ltsReply.X)
 		}(nodes)
 	}
@@ -45,7 +46,8 @@ func TestService_ReshareLTS(t *testing.T) {
 			}
 			s := newTS(t, nodes)
 			defer s.closeAll(t)
-			require.NotNil(t, s.ltsReply.LTSID)
+			require.NotNil(t, s.ltsReply.ByzCoinID)
+			require.NotNil(t, s.ltsReply.InstanceID)
 			require.NotNil(t, s.ltsReply.X)
 
 			// Create a new roster that has one fewer node that
@@ -57,7 +59,7 @@ func TestService_ReshareLTS(t *testing.T) {
 			ctx := byzcoin.ClientTransaction{
 				Instructions: []byzcoin.Instruction{
 					{
-						InstanceID: byzcoin.NewInstanceID(s.ltsReply.LTSID),
+						InstanceID: byzcoin.NewInstanceID(s.ltsReply.InstanceID),
 						Invoke: &byzcoin.Invoke{
 							Command: "reshare",
 							Args: []byzcoin.Argument{
@@ -76,7 +78,7 @@ func TestService_ReshareLTS(t *testing.T) {
 			require.NoError(t, err)
 
 			// Get the proof and start resharing
-			proof, err := s.cl.GetProof(s.ltsReply.LTSID)
+			proof, err := s.cl.GetProof(s.ltsReply.InstanceID)
 			require.NoError(t, err)
 			s.services[0].ReshareLTS(&ReshareLTS{proof.Proof})
 		}(nodes)
@@ -332,7 +334,7 @@ func (s *ts) addWriteAndWait(t *testing.T, key []byte) *byzcoin.Proof {
 }
 
 func (s *ts) addWrite(t *testing.T, key []byte, ctr uint64) byzcoin.InstanceID {
-	write := NewWrite(cothority.Suite, s.ltsReply.LTSID, s.gDarc.GetBaseID(), s.ltsReply.X, key)
+	write := NewWrite(cothority.Suite, s.ltsReply.Hash(), s.gDarc.GetBaseID(), s.ltsReply.X, key)
 	writeBuf, err := protobuf.Encode(write)
 	require.Nil(t, err)
 

@@ -8,8 +8,6 @@ import ch.epfl.dedis.byzcoin.ByzCoinRPC;
 import ch.epfl.dedis.byzcoin.Proof;
 import ch.epfl.dedis.byzcoin.contracts.DarcInstance;
 import ch.epfl.dedis.lib.crypto.KeyPair;
-import ch.epfl.dedis.lib.crypto.Point;
-import ch.epfl.dedis.lib.crypto.TestSignerX509EC;
 import ch.epfl.dedis.lib.darc.*;
 import ch.epfl.dedis.lib.exception.CothorityCommunicationException;
 import ch.epfl.dedis.lib.exception.CothorityException;
@@ -206,10 +204,10 @@ class CalypsoTest {
 
     @Test
     void getSharedPublicKey() throws Exception {
-        assertThrows(CothorityCommunicationException.class, ()-> calypso.getSharedPublicKey(new LTSId(new byte[32])));
-        Point shared = calypso.getSharedPublicKey(calypso.getLTSId());
-        assertNotNull(shared);
-        assertTrue(calypso.getLTSX().equals(shared));
+        assertThrows(CothorityCommunicationException.class, ()-> calypso.getLTSReply(new LTSId(new byte[32])));
+        CreateLTSReply lts2 = calypso.getLTSReply(calypso.getLTS().hash());
+        assertNotNull(lts2.getX());
+        assertTrue(calypso.getLTSX().equals(lts2.getX()));
     }
 
     @Test
@@ -374,7 +372,7 @@ class CalypsoTest {
     @Test
     void multiLTS() throws CothorityException{
         CalypsoRPC calypso2 = new CalypsoRPC(calypso);
-        assertFalse(calypso2.getLTSId().equals(calypso.getLTS().getLtsId()));
+        assertFalse(calypso2.getLTSId().equals(calypso.getLTS().hash()));
     }
 
     @Test

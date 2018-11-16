@@ -96,22 +96,25 @@ func (s *Service) CreateLTS(cl *CreateLTS) (reply *CreateLTSReply, err error) {
 	}
 
 	log.Lvl3("Started DKG-protocol - waiting for done", len(roster.List))
-	reply = &CreateLTSReply{LTSID: instID}
 	select {
 	case <-setupDKG.Finished:
 		shared, dks, err := setupDKG.SharedSecret()
 		if err != nil {
 			return nil, err
 		}
+		reply = &CreateLTSReply{
+			ByzCoinID:  cl.Proof.Latest.SkipChainID(),
+			InstanceID: instID,
+			X:          shared.X,
+		}
 		s.storage.Lock()
-		s.storage.Shared[string(reply.LTSID)] = shared
-		s.storage.Polys[string(reply.LTSID)] = &pubPoly{s.Suite().Point().Base(), dks.Commits}
-		s.storage.Rosters[string(reply.LTSID)] = roster
-		s.storage.OLIDs[string(reply.LTSID)] = cl.Proof.Latest.SkipChainID()
-		s.storage.DKS[string(reply.LTSID)] = dks
+		s.storage.Shared[string(reply.Hash())] = shared
+		s.storage.Polys[string(reply.Hash())] = &pubPoly{s.Suite().Point().Base(), dks.Commits}
+		s.storage.Rosters[string(reply.Hash())] = roster
+		s.storage.Replies[string(reply.Hash())] = reply
+		s.storage.DKS[string(reply.Hash())] = dks
 		s.storage.Unlock()
 		s.save()
-		reply.X = shared.X
 	case <-time.After(propagationTimeout):
 		return nil, errors.New("new-dkg didn't finish in time")
 	}
@@ -229,7 +232,7 @@ func (s *Service) DecryptKey(dkr *DecryptKey) (reply *DecryptKeyReply, err error
 		return nil, errors.New("don't know the LTSID stored in write")
 	}
 	scID := make([]byte, 32)
-	copy(scID, s.storage.OLIDs[string(write.LTSID)])
+	copy(scID, s.storage.Replies[string(write.LTSID)].ByzCoinID)
 	s.storage.Unlock()
 	if err = dkr.Read.Verify(scID); err != nil {
 		return nil, errors.New("read proof cannot be verified to come from scID: " + err.Error())
@@ -292,16 +295,20 @@ func (s *Service) DecryptKey(dkr *DecryptKey) (reply *DecryptKeyReply, err error
 	return
 }
 
-// SharedPublic returns the shared public key of an LTSID group.
-func (s *Service) SharedPublic(req *SharedPublic) (reply *SharedPublicReply, err error) {
+// GetLTSReply returns the CreateLTSReply message of a previous LTS.
+func (s *Service) GetLTSReply(req *GetLTSReply) (*CreateLTSReply, error) {
 	log.Lvl2("Getting shared public key")
 	s.storage.Lock()
-	shared, ok := s.storage.Shared[string(req.LTSID)]
+	reply, ok := s.storage.Replies[string(req.LTSID)]
 	s.storage.Unlock()
 	if !ok {
 		return nil, errors.New("didn't find this Long Term Secret")
 	}
-	return &SharedPublicReply{X: shared.X}, nil
+	return &CreateLTSReply{
+		ByzCoinID:  append([]byte{}, reply.ByzCoinID...),
+		InstanceID: append([]byte{}, reply.InstanceID...),
+		X:          reply.X.Clone(),
+	}, nil
 }
 
 // NewProtocol intercepts the DKG and OCS protocols to retrieve the values
@@ -468,7 +475,7 @@ func newService(c *onet.Context) (onet.Service, error) {
 	s := &Service{
 		ServiceProcessor: onet.NewServiceProcessor(c),
 	}
-	if err := s.RegisterHandlers(s.CreateLTS, s.ReshareLTS, s.DecryptKey, s.SharedPublic); err != nil {
+	if err := s.RegisterHandlers(s.CreateLTS, s.ReshareLTS, s.DecryptKey, s.GetLTSReply); err != nil {
 		return nil, errors.New("couldn't register messages")
 	}
 	byzcoin.RegisterContract(c, ContractWriteID, s.ContractWrite)
